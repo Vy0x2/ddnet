@@ -742,8 +742,10 @@ void CGameClient::UpdatePositions()
 
 			float multiplier = MapValue(250.0f, 50.0f, 0.1f, 0.007f, distance(m_oldMultiViewPos, vec2(posx, posy)));
 
-
-			m_Snap.m_SpecInfo.m_Position = m_oldMultiViewPos + ((vec2(posx, posy) - m_oldMultiViewPos) * clamp(multiplier, 0.003f, 1.0f));
+			if(vec2(posx, posy).operator!=(vec2(0,0)))
+				m_Snap.m_SpecInfo.m_Position = m_oldMultiViewPos + ((vec2(posx, posy) - m_oldMultiViewPos) * clamp(multiplier, 0.003f, 1.0f));
+			else
+				m_Snap.m_SpecInfo.m_Position = m_oldMultiViewPos;
 
 			m_multiplierMultiView = clamp(multiplier, 0.003f, 1.0f);
 
