@@ -733,8 +733,12 @@ void CGameClient::UpdatePositions()
 			//preference
 			zoom = zoom + m_prMultiViewZoom;
 			float currentzoom = abs(log(m_Camera.m_Zoom) / log(0.866025f) + 10);
+			if(m_oldprMultiViewZoom == m_prMultiViewZoom)
+				g_Config.m_ClSmoothZoomTime = 2000;
+			else
+				g_Config.m_ClSmoothZoomTime = 20;
 
-			g_Config.m_ClSmoothZoomTime = 2000;
+			m_oldprMultiViewZoom = m_prMultiViewZoom;
 
 			m_Camera.SetZoom(zoom);
 

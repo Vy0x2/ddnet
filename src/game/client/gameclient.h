@@ -332,6 +332,7 @@ public:
 	bool m_aMultiView[64];
 	bool m_isMultiView;
 	int m_prMultiViewZoom;
+	int m_oldprMultiViewZoom;
 	bool m_firstMultiViewEntry;
 	float m_distView;
 	float m_distPlayer;
