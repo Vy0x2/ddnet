@@ -64,7 +64,11 @@ void CDebugHud::RenderNetCorrections()
 	y += 2 * LineHeight;
 	str_format(aBuf, sizeof(aBuf), "%.2f", m_pClient->m_Snap.m_pLocalCharacter->m_X / 32.0f);
 	w = TextRender()->TextWidth(0, Fontsize, aBuf, -1, -1.0f);
-	if(str_find(aBuf, ".61")|| str_find(aBuf, ".62")|| str_find(aBuf, ".66") || str_find(aBuf, ".31") || str_find(aBuf, ".34"))
+	float tmp = str_tofloat(aBuf);
+	int dec = (int)(tmp * 100) % 100;
+	dbg_msg("dbg", "decimal: %d", dec);
+	if((dec >= 61 && dec <= 66) || (dec >= 31 && dec <= 34))
+		//str_find(aBuf, ".61")|| str_find(aBuf, ".62")|| str_find(aBuf, ".66") || str_find(aBuf, ".31") || str_find(aBuf, ".34"))
 	{
 		ColorRGBA Color = ColorRGBA(0.0f, 1.0f, 0.0f, 1.0f);
 		TextRender()->TextColor(Color);
