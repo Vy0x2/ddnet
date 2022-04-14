@@ -1,4 +1,4 @@
-/* (c) Magnus Auvinen. See licence.txt in the root of the distribution for more information. */
+﻿/* (c) Magnus Auvinen. See licence.txt in the root of the distribution for more information. */
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 #include <engine/graphics.h>
 #include <engine/shared/config.h>
@@ -65,14 +65,36 @@ void CDebugHud::RenderNetCorrections()
 	str_format(aBuf, sizeof(aBuf), "%.2f", m_pClient->m_Snap.m_pLocalCharacter->m_X / 32.0f);
 	w = TextRender()->TextWidth(0, Fontsize, aBuf, -1, -1.0f);
 	float tmp = str_tofloat(aBuf);
-	int dec = (int)(tmp * 100) % 100;
-	dbg_msg("dbg", "decimal: %d", dec);
-	if((dec >= 61 && dec <= 66) || (dec >= 31 && dec <= 34))
-		//str_find(aBuf, ".61")|| str_find(aBuf, ".62")|| str_find(aBuf, ".66") || str_find(aBuf, ".31") || str_find(aBuf, ".34"))
+	int dec = (round_to_int(tmp * 100)) % 100;
+
+	/*if((dec >= 61 && dec <= 66) || (dec >= 31 && dec <= 34))
 	{
-		ColorRGBA Color = ColorRGBA(0.0f, 1.0f, 0.0f, 1.0f);
+
+		ColorRGBA Color = ColorRGBA(0.0f, 1.0f, 0.0f, 0.8f);
 		TextRender()->TextColor(Color);
+	}*/
+
+	if((dec >= 61 && dec <= 66))
+	{
+		str_append(aBuf, "↗", sizeof(aBuf));
 	}
+	else if(dec >= 31 && dec <= 34)
+	{
+		str_append(aBuf, "↖", sizeof(aBuf));
+	}
+
+	char aBuf2[128];
+	// dbg_msg("dbg", "aBuf: %s, float: %f, dec: %d", aBuf, tmp, dec);
+	if(dec >= 44 && dec <= 53)
+	{
+		if(dec == 44)
+			str_append(aBuf, "←", sizeof(aBuf));
+		else if(dec == 53)
+			str_append(aBuf, "→", sizeof(aBuf));
+		else
+			str_append(aBuf, "⊡", sizeof(aBuf));
+	}
+
 	TextRender()->Text(0, x - w, y, Fontsize, aBuf, -1.0f);
 	TextRender()->TextColor(ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f)); // reset color
 	y += LineHeight;
