@@ -339,6 +339,8 @@ public:
 	bool m_idsActivated;
 	float m_multiplierMultiView;
 	float m_velMultiView;
+	bool m_isWidthMultiView;
+	int64_t m_lastSwitchTickMultiView;
 
 	// client data
 	struct CClientData
@@ -666,6 +668,9 @@ private:
 	void DetectStrongHook();
 	vec2 GetSmoothPos(int ClientID);
 	float MapValue(float valuemax, float valuemin, float rangemax, float rangemin, float value);
+	float ZoomStuff(vec2 minpos, vec2 maxpos);
+	void SpectateClosest();
+	void CleanIds();
 
 	int m_PredictedDummyID;
 	int m_IsDummySwapping;

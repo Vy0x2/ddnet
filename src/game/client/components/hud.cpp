@@ -808,17 +808,18 @@ void CHud::RenderSpectatorHud()
 	char prMulti[128];
 	char help[128];
 	char version[128];
-	str_format(version, sizeof(version), "%s", "v4.2");
+	str_format(version, sizeof(version), "%s", "v4.3");
 	str_format(prMulti, sizeof(prMulti), "%s%d", GameClient()->m_prMultiViewZoom > 0 ? "+" : "", GameClient()->m_prMultiViewZoom);
-	str_format(MultiView, sizeof(MultiView), "%s (zoom: %.1f (%s), cdist: %.0f, pdist: %.0f, ids: %s, speed: %.3f, vel: %.1f)",
-												version,
-												(log(m_pClient->m_Camera.m_Zoom) / log(0.866025f)) + 10,
+	str_format(MultiView, sizeof(MultiView), "%s (zoom: %.1f%s (%s), cdist: %.0f, pdist: %.0f, cvel: %.2f, pvel: %.0f, ids: %s)",
+											   version,
+											   (log(m_pClient->m_Camera.m_Zoom) / log(0.866025f)) + 10,
+											   GameClient()->m_isWidthMultiView == true ? "w" : "h",
 												GameClient()->m_prMultiViewZoom == 0 ? "auto" : prMulti,
 												GameClient()->m_distView,
 												GameClient()->m_distPlayer,
-												GameClient()->m_idsActivated ? "yes" : "no",
 												GameClient()->m_multiplierMultiView,
-												GameClient()->m_velMultiView);
+												GameClient()->m_velMultiView,
+												GameClient()->m_idsActivated ? "yes" : "no");
 	str_format(help, sizeof(help), "%s", m_pClient->m_Snap.m_SpecInfo.m_SpectatorID != SPEC_FREEVIEW ? (GameClient()->m_isMultiView ? MultiView : m_pClient->m_aClients[m_pClient->m_Snap.m_SpecInfo.m_SpectatorID].m_aName) : Localize("Free-View"));
 	if(g_Config.m_ClMultiViewDebug)
 		str_format(aBuf, sizeof(aBuf), "%s%s %s",
