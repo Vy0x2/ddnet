@@ -594,7 +594,7 @@ void CGameClient::UpdatePositions()
 			float tmpVel = 0.0f;
 			m_velMultiView = 0.0f;
 
-			for(int j = 0; j < MAX_CLIENTS; j++)
+			for(int j = 0; j < MAX_CLIENTS; j++) // are ids activated?
 				if(m_aMultiView[j] == true)
 					idsActivated = true;
 
@@ -643,22 +643,22 @@ void CGameClient::UpdatePositions()
 
 			m_Camera.SetZoom(ZoomStuff(minpos, maxpos));
 
-			float multiplier = MapValue(250.0f, 50.0f, 0.1f, 0.007f, distance(m_oldMultiViewPos, vec2(posx, posy)));
+			float multiplier = MultiplierStuff(vec2(posx, posy));
 
 			if(vec2(posx, posy).operator!=(vec2(0,0)))
-				m_Snap.m_SpecInfo.m_Position = m_oldMultiViewPos + ((vec2(posx, posy) - m_oldMultiViewPos) * clamp(multiplier, 0.003f, 1.0f));
+				m_Snap.m_SpecInfo.m_Position = m_oldMultiViewPos + ((vec2(posx, posy) - m_oldMultiViewPos) * multiplier);
 			else
+			{
 				m_Snap.m_SpecInfo.m_Position = m_oldMultiViewPos;
 
-			m_multiplierMultiView = clamp(multiplier, 0.003f, 1.0f);
+				if(m_oldMultiViewPos.operator==(vec2(0, 0)))
+					m_Spectator.Spectate(m_Snap.m_SpecInfo.m_SpectatorID);
+			}
 
 			m_oldSpecMultiViewID = m_Snap.m_SpecInfo.m_SpectatorID;
 
 			m_oldMultiViewPos = m_Snap.m_SpecInfo.m_Position;
 			m_Snap.m_SpecInfo.m_UsePosition = true;
-
-			if(m_oldMultiViewPos.operator==(vec2(0, 0)))
-				m_Spectator.Spectate(m_Snap.m_SpecInfo.m_SpectatorID);
 		}
 		else if(Client()->State() == IClient::STATE_DEMOPLAYBACK && m_DemoSpecID != SPEC_FOLLOW && m_Snap.m_SpecInfo.m_SpectatorID != SPEC_FREEVIEW)
 		{
@@ -699,6 +699,23 @@ void CGameClient::UpdatePositions()
 	}
 
 	UpdateRenderedCharacters();
+}
+
+float CGameClient::MultiplierStuff(vec2 camerapos)
+{
+	float maxCameraDist = 250.0f;
+	float minCameraDist = 50.0f;
+	float maxVel = 0.1f;
+	float minVel = 0.007f;
+
+	if(m_velMultiView > 23)
+		maxCameraDist = maxCameraDist - clamp(MapValue(50, 20, 100, 10, m_velMultiView), 0.0f, 100.0f);
+
+	float multiplier = MapValue(maxCameraDist, minCameraDist, maxVel, minVel, distance(m_oldMultiViewPos, vec2(camerapos.x, camerapos.y)));
+	multiplier = clamp(multiplier, 0.003f, 1.0f);
+	m_multiplierMultiView = multiplier;
+	
+	return multiplier;
 }
 
 void CGameClient::CleanIds()
@@ -744,8 +761,9 @@ float CGameClient::ZoomStuff(vec2 minpos, vec2 maxpos)
 {
 	float maxPlayerDistance = 1900.0f;
 	float minPlayerDistance = 300.0f;
-	float maxZoom = 0.0f;
+	float maxZoom = 3.0f;
 	float minZoom = 8.0f;
+	bool width = false;
 
 	if(maxpos.x - minpos.x > maxpos.y - minpos.y)
 	{
@@ -756,14 +774,14 @@ float CGameClient::ZoomStuff(vec2 minpos, vec2 maxpos)
 				m_isWidthMultiView = true;
 				m_lastSwitchTickMultiView = time_get() + time_freq() * 3;
 			}
-			maxZoom = 2.9f;
+			width = false;
 		}
 		else
 		{
 			if(m_lastSwitchTickMultiView <= time_get())
-				maxZoom = 5.5f;
+				width = true;
 			else
-				maxZoom = 2.9f;
+				width = false;
 		}
 	}
 	else
@@ -775,15 +793,30 @@ float CGameClient::ZoomStuff(vec2 minpos, vec2 maxpos)
 				m_isWidthMultiView = false;
 				m_lastSwitchTickMultiView = time_get() + time_freq() * 3;
 			}
-			maxZoom = 5.5f;
+			width = true;
 		}
 		else
 		{
 			if(m_lastSwitchTickMultiView <= time_get())
-				maxZoom = 2.9f;
+				width = false;
 			else
-				maxZoom = 5.5f;
+				width = true;
 		}
+	}
+
+	if(width)
+	{
+		maxPlayerDistance = 1900.0f;
+		minPlayerDistance = 300.0f;
+		maxZoom = 5.5f;
+		minZoom = 8.0f;
+	}
+	else
+	{
+		maxPlayerDistance = 2000.0f;
+		minPlayerDistance = 150.0f;
+		maxZoom = 2.9f;
+		minZoom = 8.0f;
 	}
 
 	float zoom = MapValue(maxPlayerDistance, minPlayerDistance, maxZoom, minZoom, m_distPlayer);
@@ -796,19 +829,18 @@ float CGameClient::ZoomStuff(vec2 minpos, vec2 maxpos)
 	if(m_velMultiView > 10)
 		diff = MapValue(150, 15, -2.5f, -1.0f, m_velMultiView);
 
-	// dbg_msg("dbg", "vel: %f, diff: %f, zoom old: %f, zoom new: %f", m_velMultiView, diff, zoom, zoom + clamp(diff, -3.5f, 0.0f));
-
 	zoom = zoom + clamp(diff, -3.5f, 0.0f);
 
 	zoom = clamp(zoom, -3.5f, 8.0f);
 
 	// preference
 	zoom = zoom + m_prMultiViewZoom;
+	m_oldprMultiViewZoom = m_prMultiViewZoom;
+
 	if(m_oldprMultiViewZoom == m_prMultiViewZoom)
 		g_Config.m_ClSmoothZoomTime = 2000;
 	else
 		g_Config.m_ClSmoothZoomTime = 20;
-	m_oldprMultiViewZoom = m_prMultiViewZoom;
 
 	return zoom;
 }

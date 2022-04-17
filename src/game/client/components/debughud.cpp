@@ -74,11 +74,11 @@ void CDebugHud::RenderNetCorrections()
 		TextRender()->TextColor(Color);
 	}*/
 
-	if((dec >= 61 && dec <= 66))
+	if((dec >= 61 && dec <= 66) || dec == 81)
 	{
 		str_append(aBuf, "↗", sizeof(aBuf));
 	}
-	else if(dec >= 31 && dec <= 34)
+	else if((dec >= 31 && dec <= 34) || dec == 16)
 	{
 		str_append(aBuf, "↖", sizeof(aBuf));
 	}

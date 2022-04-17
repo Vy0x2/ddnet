@@ -669,6 +669,7 @@ private:
 	vec2 GetSmoothPos(int ClientID);
 	float MapValue(float valuemax, float valuemin, float rangemax, float rangemin, float value);
 	float ZoomStuff(vec2 minpos, vec2 maxpos);
+	float MultiplierStuff(vec2 camerapos);
 	void SpectateClosest();
 	void CleanIds();
 
