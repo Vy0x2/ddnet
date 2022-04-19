@@ -578,7 +578,9 @@ void CGameClient::UpdatePositions()
 				for(int i = 0; i < MAX_CLIENTS; i++)
 				{
 					if(m_Snap.m_aCharacters[i].m_Cur.m_X != 0 && m_Snap.m_aCharacters[i].m_Cur.m_Y != 0)
+					{
 						m_aMultiView[i] = true;
+					}
 				}
 			}
 			
@@ -596,13 +598,15 @@ void CGameClient::UpdatePositions()
 			float tmpVel = 0.0f;
 			m_velMultiView = 0.0f;
 
-			for(int j = 0; j < MAX_CLIENTS; j++) // are ids activated?
-				if(m_aMultiView[j] == true)
+			for(bool id : m_aMultiView) // are ids activated?
+			{
+				if(id)
 					idsActivated = true;
+			}
 
 			for(int i = 0; i < MAX_CLIENTS; i++)
 			{
-				if(m_idsActivated && m_aMultiView[i] == false) // special ids activated and not in the list
+				if(m_idsActivated && !m_aMultiView[i]) // special ids activated and not in the list
 					continue;
 
 				if(m_Snap.m_aCharacters[i].m_Cur.m_X == 0) // not rendered
@@ -613,7 +617,9 @@ void CGameClient::UpdatePositions()
 				if(m_Snap.m_SpecInfo.m_SpectatorID != i)
 				{
 					if(distance(m_oldMultiViewPos, vec2(player.x, player.y)) > 1500 && m_aClients[i].m_FreezeEnd != 0) // too far away and frozen, so not relevant
+					{
 						continue;
+					}
 				}
 					
 				if(!init)
@@ -722,8 +728,8 @@ float CGameClient::MultiplierStuff(vec2 camerapos)
 
 void CGameClient::CleanIds()
 {
-	for(int i = 0; i < MAX_CLIENTS; i++)
-		m_aMultiView[i] = false;
+	for(bool id : m_aMultiView)
+		id = false;
 
 	m_cleanIds = false;
 }
@@ -767,9 +773,6 @@ float CGameClient::ZoomStuff(vec2 minpos, vec2 maxpos)
 	float minZoom = 8.0f;
 	//default values, never get used
 	bool width = false;
-
-	if(m_lastSwitchTickMultiView == 0) // first time
-		width = maxpos.x - minpos.x > maxpos.y - minpos.y;
 
 	if(maxpos.x - minpos.x > maxpos.y - minpos.y)
 	{
