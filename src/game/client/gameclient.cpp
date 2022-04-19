@@ -587,7 +587,6 @@ void CGameClient::UpdatePositions()
 				CleanIds();
 
 			bool init = false;
-			bool initdone = false;
 			bool idsActivated = false;
 			vec2 minpos, maxpos;
 			int amountPlayers = 0;
@@ -648,17 +647,15 @@ void CGameClient::UpdatePositions()
 			if(vec2(posx, posy).operator!=(vec2(0,0)))
 				m_Snap.m_SpecInfo.m_Position = m_oldMultiViewPos + ((vec2(posx, posy) - m_oldMultiViewPos) * multiplier);
 			else
-			{
 				m_Snap.m_SpecInfo.m_Position = m_oldMultiViewPos;
-
-				if(m_oldMultiViewPos.operator==(vec2(0, 0)))
-					m_Spectator.Spectate(m_Snap.m_SpecInfo.m_SpectatorID);
-			}
 
 			m_oldSpecMultiViewID = m_Snap.m_SpecInfo.m_SpectatorID;
 
 			m_oldMultiViewPos = m_Snap.m_SpecInfo.m_Position;
 			m_Snap.m_SpecInfo.m_UsePosition = true;
+
+			if(m_oldMultiViewPos.operator==(vec2(0, 0)))
+				m_Spectator.Spectate(m_Snap.m_SpecInfo.m_SpectatorID);
 		}
 		else if(Client()->State() == IClient::STATE_DEMOPLAYBACK && m_DemoSpecID != SPEC_FOLLOW && m_Snap.m_SpecInfo.m_SpectatorID != SPEC_FREEVIEW)
 		{
@@ -763,45 +760,43 @@ float CGameClient::ZoomStuff(vec2 minpos, vec2 maxpos)
 	float minPlayerDistance = 300.0f;
 	float maxZoom = 3.0f;
 	float minZoom = 8.0f;
+	//default values, never get used
 	bool width = false;
+
+	if(m_lastSwitchTickMultiView == 0) // first time
+		width = maxpos.x - minpos.x > maxpos.y - minpos.y;
 
 	if(maxpos.x - minpos.x > maxpos.y - minpos.y)
 	{
 		if(!m_isWidthMultiView)
 		{
-			if(m_lastSwitchTickMultiView < time_get())
+			if(m_lastSwitchTickMultiView > time_get())
+				width = false;
+			else
 			{
 				m_isWidthMultiView = true;
 				m_lastSwitchTickMultiView = time_get() + time_freq() * 3;
+				width = true;
 			}
-			width = false;
 		}
 		else
-		{
-			if(m_lastSwitchTickMultiView <= time_get())
 				width = true;
-			else
-				width = false;
-		}
 	}
 	else
 	{
 		if(m_isWidthMultiView)
 		{
-			if(m_lastSwitchTickMultiView < time_get())
+			if(m_lastSwitchTickMultiView > time_get())
+				width = true;
+			else
 			{
 				m_isWidthMultiView = false;
 				m_lastSwitchTickMultiView = time_get() + time_freq() * 3;
+				width = false;
 			}
-			width = true;
 		}
 		else
-		{
-			if(m_lastSwitchTickMultiView <= time_get())
-				width = false;
-			else
-				width = true;
-		}
+			width = false;
 	}
 
 	if(width)
@@ -827,20 +822,20 @@ float CGameClient::ZoomStuff(vec2 minpos, vec2 maxpos)
 	float diff = 0.0f;
 
 	if(m_velMultiView > 10)
-		diff = MapValue(150, 15, -2.5f, -1.0f, m_velMultiView);
+		diff = MapValue(150, 15, -1.5f, -1.0f, m_velMultiView);
 
-	zoom = zoom + clamp(diff, -3.5f, 0.0f);
+	zoom = zoom + clamp(diff, -1.5f, 0.0f);
 
-	zoom = clamp(zoom, -3.5f, 8.0f);
+	zoom = clamp(zoom, -2.5f, 8.0f);
 
 	// preference
-	zoom = zoom + m_prMultiViewZoom;
-	m_oldprMultiViewZoom = m_prMultiViewZoom;
-
 	if(m_oldprMultiViewZoom == m_prMultiViewZoom)
 		g_Config.m_ClSmoothZoomTime = 2000;
 	else
 		g_Config.m_ClSmoothZoomTime = 20;
+
+	zoom = zoom + m_prMultiViewZoom;
+	m_oldprMultiViewZoom = m_prMultiViewZoom; // has to be after choosing
 
 	return zoom;
 }

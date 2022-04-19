@@ -681,7 +681,6 @@ private:
 
 	vec2 m_oldMultiViewPos;
 	int m_oldSpecMultiViewID;
-	float m_oldZoomMulti;
 	bool m_cleanIds;
 
 	enum

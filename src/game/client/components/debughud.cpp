@@ -83,7 +83,6 @@ void CDebugHud::RenderNetCorrections()
 		str_append(aBuf, "↖", sizeof(aBuf));
 	}
 
-	char aBuf2[128];
 	// dbg_msg("dbg", "aBuf: %s, float: %f, dec: %d", aBuf, tmp, dec);
 	if(dec >= 44 && dec <= 53)
 	{
