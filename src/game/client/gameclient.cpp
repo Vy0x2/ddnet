@@ -576,8 +576,10 @@ void CGameClient::UpdatePositions()
 				CleanIds();
 
 				for(int i = 0; i < MAX_CLIENTS; i++)
+				{
 					if(m_Snap.m_aCharacters[i].m_Cur.m_X != 0 && m_Snap.m_aCharacters[i].m_Cur.m_Y != 0)
 						m_aMultiView[i] = true;
+				}
 			}
 			
 			SpectateClosest();
@@ -609,8 +611,10 @@ void CGameClient::UpdatePositions()
 				vec2 player = vec2(m_aClients[i].m_RenderPos.x, m_aClients[i].m_RenderPos.y);
 
 				if(m_Snap.m_SpecInfo.m_SpectatorID != i)
+				{
 					if(distance(m_oldMultiViewPos, vec2(player.x, player.y)) > 1500 && m_aClients[i].m_FreezeEnd != 0) // too far away and frozen, so not relevant
 						continue;
+				}
 					
 				if(!init)
 				{
@@ -772,7 +776,9 @@ float CGameClient::ZoomStuff(vec2 minpos, vec2 maxpos)
 		if(!m_isWidthMultiView)
 		{
 			if(m_lastSwitchTickMultiView > time_get())
+			{
 				width = false;
+			}
 			else
 			{
 				m_isWidthMultiView = true;
