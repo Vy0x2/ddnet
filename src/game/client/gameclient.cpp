@@ -137,6 +137,7 @@ void CGameClient::OnConsoleInit()
 	m_All.Add(&m_Statboard);
 	m_All.Add(&m_Motd);
 	m_All.Add(&m_Menus);
+	m_All.Add(&m_Tooltips);
 	m_All.Add(&CMenus::m_Binder);
 	m_All.Add(&m_GameConsole);
 
@@ -1224,7 +1225,7 @@ static CGameInfo GetGameInfo(const CNetObj_GameInfoEx *pInfoEx, int InfoExSize, 
 	Info.m_UnlimitedAmmo = Race;
 	Info.m_DDRaceRecordMessage = DDRace && !DDNet;
 	Info.m_RaceRecordMessage = DDNet || (Race && !DDRace);
-	Info.m_RaceSounds = DDRace || FNG;
+	Info.m_RaceSounds = DDRace || FNG || BlockWorlds;
 	Info.m_AllowEyeWheel = DDRace || BlockWorlds || City || Plus;
 	Info.m_AllowHookColl = DDRace;
 	Info.m_AllowZoom = Race || BlockWorlds || City;
