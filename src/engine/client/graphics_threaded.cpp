@@ -1470,12 +1470,14 @@ void CGraphics_Threaded::QuadContainerUpload(int ContainerIndex)
 	}
 }
 
-void CGraphics_Threaded::QuadContainerAddQuads(int ContainerIndex, CQuadItem *pArray, int Num)
+int CGraphics_Threaded::QuadContainerAddQuads(int ContainerIndex, CQuadItem *pArray, int Num)
 {
 	SQuadContainer &Container = m_QuadContainers[ContainerIndex];
 
 	if((int)Container.m_Quads.size() > Num + CCommandBuffer::CCommandBuffer::MAX_VERTICES)
-		return;
+		return -1;
+
+	int RetOff = (int)Container.m_Quads.size();
 
 	for(int i = 0; i < Num; ++i)
 	{
@@ -1514,14 +1516,18 @@ void CGraphics_Threaded::QuadContainerAddQuads(int ContainerIndex, CQuadItem *pA
 
 	if(Container.m_AutomaticUpload)
 		QuadContainerUpload(ContainerIndex);
+
+	return RetOff;
 }
 
-void CGraphics_Threaded::QuadContainerAddQuads(int ContainerIndex, CFreeformItem *pArray, int Num)
+int CGraphics_Threaded::QuadContainerAddQuads(int ContainerIndex, CFreeformItem *pArray, int Num)
 {
 	SQuadContainer &Container = m_QuadContainers[ContainerIndex];
 
 	if((int)Container.m_Quads.size() > Num + CCommandBuffer::CCommandBuffer::MAX_VERTICES)
-		return;
+		return -1;
+
+	int RetOff = (int)Container.m_Quads.size();
 
 	for(int i = 0; i < Num; ++i)
 	{
@@ -1551,6 +1557,8 @@ void CGraphics_Threaded::QuadContainerAddQuads(int ContainerIndex, CFreeformItem
 
 	if(Container.m_AutomaticUpload)
 		QuadContainerUpload(ContainerIndex);
+
+	return RetOff;
 }
 
 void CGraphics_Threaded::QuadContainerReset(int ContainerIndex)
@@ -2270,7 +2278,7 @@ void CGraphics_Threaded::AdjustViewport(bool SendViewportChangeToBackend)
 
 		if(SendViewportChangeToBackend)
 		{
-			UpdateViewport(0, 0, m_ScreenWidth, m_ScreenWidth, true);
+			UpdateViewport(0, 0, m_ScreenWidth, m_ScreenHeight, true);
 		}
 	}
 	else
@@ -2594,7 +2602,7 @@ void CGraphics_Threaded::GotResized(int w, int h, int RefreshRate)
 	g_Config.m_GfxScreenRefreshRate = m_ScreenRefreshRate;
 	m_ScreenHiDPIScale = m_ScreenWidth / (float)g_Config.m_GfxScreenWidth;
 
-	UpdateViewport(0, 0, m_ScreenWidth, m_ScreenWidth, true);
+	UpdateViewport(0, 0, m_ScreenWidth, m_ScreenHeight, true);
 
 	// kick the command buffer and wait
 	KickCommandBuffer();
@@ -2740,7 +2748,7 @@ bool CGraphics_Threaded::SetVSync(bool State)
 	if(!m_pCommandBuffer)
 		return true;
 
-	// add vsnc command
+	// add vsync command
 	bool RetOk = false;
 	CCommandBuffer::SCommand_VSync Cmd;
 	Cmd.m_VSync = State ? 1 : 0;
@@ -2748,6 +2756,30 @@ bool CGraphics_Threaded::SetVSync(bool State)
 
 	if(!AddCmd(
 		   Cmd, [] { return true; }, "failed to add vsync command"))
+	{
+		return false;
+	}
+
+	// kick the command buffer
+	KickCommandBuffer();
+	WaitForIdle();
+	return RetOk;
+}
+
+bool CGraphics_Threaded::SetMultiSampling(uint32_t ReqMultiSamplingCount, uint32_t &MultiSamplingCountBackend)
+{
+	if(!m_pCommandBuffer)
+		return true;
+
+	// add multisampling command
+	bool RetOk = false;
+	CCommandBuffer::SCommand_MultiSampling Cmd;
+	Cmd.m_RequestedMultiSamplingCount = ReqMultiSamplingCount;
+	Cmd.m_pRetMultiSamplingCount = &MultiSamplingCountBackend;
+	Cmd.m_pRetOk = &RetOk;
+
+	if(!AddCmd(
+		   Cmd, [] { return true; }, "failed to add multi sampling command"))
 	{
 		return false;
 	}
