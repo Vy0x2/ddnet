@@ -509,7 +509,7 @@ public:
 	int m_LocalIDs[NUM_DUMMIES];
 	CNetObj_PlayerInput m_DummyInput;
 	CNetObj_PlayerInput m_HammerInput;
-	int m_DummyFire;
+	unsigned int m_DummyFire;
 	bool m_ReceivedDDNetPlayer;
 
 	class CTeamsCore m_Teams;
@@ -602,6 +602,10 @@ public:
 		// pickups
 		IGraphics::CTextureHandle m_SpritePickupHealth;
 		IGraphics::CTextureHandle m_SpritePickupArmor;
+		IGraphics::CTextureHandle m_SpritePickupArmorShotgun;
+		IGraphics::CTextureHandle m_SpritePickupArmorGrenade;
+		IGraphics::CTextureHandle m_SpritePickupArmorLaser;
+		IGraphics::CTextureHandle m_SpritePickupArmorNinja;
 		IGraphics::CTextureHandle m_SpritePickupGrenade;
 		IGraphics::CTextureHandle m_SpritePickupShotgun;
 		IGraphics::CTextureHandle m_SpritePickupLaser;
