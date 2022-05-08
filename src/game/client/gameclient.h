@@ -332,6 +332,7 @@ public:
 	int m_ExpectingTuningForZone[2];
 	int m_ExpectingTuningSince[2];
 
+	// public Multi-View variables (debug)
 	bool m_aMultiView[64];
 	bool m_isMultiView;
 	int m_prMultiViewZoom;
@@ -670,9 +671,13 @@ private:
 	void UpdateRenderedCharacters();
 	void DetectStrongHook();
 	vec2 GetSmoothPos(int ClientID);
+
+	// Multi-View functions
 	float MapValue(float valuemax, float valuemin, float rangemax, float rangemin, float value);
 	float ZoomStuff(vec2 minpos, vec2 maxpos);
 	float MultiplierStuff(vec2 camerapos);
+	void HandleMultiView();
+	void InitMultiViewFromFreeview();
 	void SpectateClosest();
 	void CleanIds();
 
@@ -682,6 +687,7 @@ private:
 	class CCharacter m_aLastWorldCharacters[MAX_CLIENTS];
 	int m_SwitchStateTeam[NUM_DUMMIES];
 
+	// Multi-View variables
 	vec2 m_oldMultiViewPos;
 	int m_oldSpecMultiViewID;
 	bool m_cleanIds;

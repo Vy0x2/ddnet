@@ -551,8 +551,6 @@ void CGameClient::UpdatePositions()
 				if(m_Snap.m_pLocalCharacter)
 					m_LocalCharacterPos = mix(m_PredictedPrevChar.m_Pos, m_PredictedChar.m_Pos, Client()->PredIntraGameTick(g_Config.m_ClDummy));
 			}
-			//		else
-			//			m_LocalCharacterPos = mix(m_PredictedPrevChar.m_Pos, m_PredictedChar.m_Pos, Client()->PredIntraGameTick(g_Config.m_ClDummy));
 		}
 	}
 	else if(m_Snap.m_pLocalCharacter && m_Snap.m_pLocalPrevCharacter)
@@ -562,105 +560,17 @@ void CGameClient::UpdatePositions()
 			vec2(m_Snap.m_pLocalCharacter->m_X, m_Snap.m_pLocalCharacter->m_Y), Client()->IntraGameTick(g_Config.m_ClDummy));
 	}
 
-	//dbg_msg("dbg", "Distanz: %f", distance(vec2(m_aClients[0].m_RenderPos.x, m_aClients[0].m_RenderPos.y), vec2(m_aClients[1].m_RenderPos.x, m_aClients[1].m_RenderPos.y)));
-
 	// spectator position
 	if(m_Snap.m_SpecInfo.m_Active)
 	{
-		if(m_isMultiView && m_Snap.m_SpecInfo.m_SpectatorID == SPEC_FREEVIEW) // Choose multi view in free view
+		// Executed only once: When you pick Multi View in freeview and want to spectate a specific group with fixed client ids
+		if(m_isMultiView && m_Snap.m_SpecInfo.m_SpectatorID == SPEC_FREEVIEW)
 		{
-			if(m_oldSpecMultiViewID != m_Snap.m_SpecInfo.m_SpectatorID || !m_firstMultiViewEntry)
-			{
-				m_firstMultiViewEntry = true;
-
-				CleanIds();
-
-				for(int i = 0; i < MAX_CLIENTS; i++)
-				{
-					if(m_Snap.m_aCharacters[i].m_Cur.m_X != 0 && m_Snap.m_aCharacters[i].m_Cur.m_Y != 0)
-						m_aMultiView[i] = true;
-				}
-			}
-			
-			SpectateClosest();
+			InitMultiViewFromFreeview();
 		}
 		else if(m_isMultiView)
 		{
-			if(m_cleanIds)
-				CleanIds();
-
-			bool init = false;
-			bool idsActivated = false;
-			vec2 minpos, maxpos;
-			int amountPlayers = 0;
-			float tmpVel = 0.0f;
-			m_velMultiView = 0.0f;
-
-			for(int j = 0; j < MAX_CLIENTS; j++) // are ids activated?
-				if(m_aMultiView[j] == true)
-					idsActivated = true;
-
-			for(int i = 0; i < MAX_CLIENTS; i++)
-			{
-				if(m_idsActivated && m_aMultiView[i] == false) // special ids activated and not in the list
-					continue;
-
-				if(m_Snap.m_aCharacters[i].m_Cur.m_X == 0) // not rendered
-					continue;
-
-				vec2 player = vec2(m_aClients[i].m_RenderPos.x, m_aClients[i].m_RenderPos.y);
-
-				if(m_Snap.m_SpecInfo.m_SpectatorID != i)
-				{
-					if(distance(m_oldMultiViewPos, vec2(player.x, player.y)) > 1500 && m_aClients[i].m_FreezeEnd != 0) // too far away and frozen, so not relevant
-						continue;
-				}
-					
-				if(!init)
-				{
-					minpos = player;
-					maxpos = player;
-					init = true;
-				}
-
-				if(player.x < minpos.x)
-					minpos.x = player.x;
-				if(player.x > maxpos.x)
-					maxpos.x = player.x;
-				if(player.y < minpos.y)
-					minpos.y = player.y;
-				if(player.y > maxpos.y)
-					maxpos.y = player.y;
-
-				const CNetObj_Character &CurrentCharacter = m_Snap.m_aCharacters[i].m_Cur;
-				tmpVel += (length(vec2(CurrentCharacter.m_VelX / 256.0f, CurrentCharacter.m_VelY / 256.0f)) * 50) / 32.0f;
-				amountPlayers++;
-			}
-
-			float posx = (minpos.x + maxpos.x) / 2.0f;
-			float posy = (minpos.y + maxpos.y) / 2.0f;
-
-			m_idsActivated = idsActivated;
-			m_velMultiView = tmpVel / (float)amountPlayers;
-			m_distPlayer = distance(minpos, maxpos);
-			m_distView = distance(m_oldMultiViewPos, vec2(posx, posy));
-
-			m_Camera.SetZoom(ZoomStuff(minpos, maxpos));
-
-			float multiplier = MultiplierStuff(vec2(posx, posy));
-
-			if(vec2(posx, posy).operator!=(vec2(0,0)))
-				m_Snap.m_SpecInfo.m_Position = m_oldMultiViewPos + ((vec2(posx, posy) - m_oldMultiViewPos) * multiplier);
-			else
-				m_Snap.m_SpecInfo.m_Position = m_oldMultiViewPos;
-
-			m_oldSpecMultiViewID = m_Snap.m_SpecInfo.m_SpectatorID;
-
-			m_oldMultiViewPos = m_Snap.m_SpecInfo.m_Position;
-			m_Snap.m_SpecInfo.m_UsePosition = true;
-
-			if(m_oldMultiViewPos.operator==(vec2(0, 0)))
-				m_Spectator.Spectate(m_Snap.m_SpecInfo.m_SpectatorID);
+			HandleMultiView();
 		}
 		else if(Client()->State() == IClient::STATE_DEMOPLAYBACK && m_DemoSpecID != SPEC_FOLLOW && m_Snap.m_SpecInfo.m_SpectatorID != SPEC_FREEVIEW)
 		{
@@ -680,6 +590,7 @@ void CGameClient::UpdatePositions()
 			m_Snap.m_SpecInfo.m_UsePosition = true;
 		}
 
+		// got out of multi view so reset zoom smoothness and let the ids be deleted
 		if(!m_isMultiView || (m_isMultiView && m_Snap.m_SpecInfo.m_SpectatorID == SPEC_FREEVIEW))
 		{
 			g_Config.m_ClSmoothZoomTime = 250;
@@ -701,6 +612,104 @@ void CGameClient::UpdatePositions()
 	}
 
 	UpdateRenderedCharacters();
+}
+
+void CGameClient::HandleMultiView()
+{
+	if(m_cleanIds)
+		CleanIds();
+
+	bool init = false;
+	bool idsActivated = false;
+	vec2 minpos, maxpos;
+	int amountPlayers = 0;
+	float tmpVel = 0.0f;
+	m_velMultiView = 0.0f;
+
+	for(int j = 0; j < MAX_CLIENTS; j++) // are ids activated?
+		if(m_aMultiView[j] == true)
+			idsActivated = true;
+
+	for(int i = 0; i < MAX_CLIENTS; i++)
+	{
+		if(m_idsActivated && m_aMultiView[i] == false) // special ids activated and not in the list
+			continue;
+
+		if(m_Snap.m_aCharacters[i].m_Cur.m_X == 0) // not rendered
+			continue;
+
+		vec2 player = vec2(m_aClients[i].m_RenderPos.x, m_aClients[i].m_RenderPos.y);
+
+		if(m_Snap.m_SpecInfo.m_SpectatorID != i)
+		{
+			if(distance(m_oldMultiViewPos, vec2(player.x, player.y)) > 1500 && m_aClients[i].m_FreezeEnd != 0) // too far away and frozen, so not relevant
+				continue;
+		}
+
+		if(!init)
+		{
+			minpos = player;
+			maxpos = player;
+			init = true;
+		}
+
+		if(player.x < minpos.x)
+			minpos.x = player.x;
+		if(player.x > maxpos.x)
+			maxpos.x = player.x;
+		if(player.y < minpos.y)
+			minpos.y = player.y;
+		if(player.y > maxpos.y)
+			maxpos.y = player.y;
+
+		const CNetObj_Character &CurrentCharacter = m_Snap.m_aCharacters[i].m_Cur;
+		tmpVel += (length(vec2(CurrentCharacter.m_VelX / 256.0f, CurrentCharacter.m_VelY / 256.0f)) * 50) / 32.0f;
+		amountPlayers++;
+	}
+
+	float posx = (minpos.x + maxpos.x) / 2.0f;
+	float posy = (minpos.y + maxpos.y) / 2.0f;
+
+	m_idsActivated = idsActivated;
+	m_velMultiView = tmpVel / (float)amountPlayers;
+	m_distPlayer = distance(minpos, maxpos);
+	m_distView = distance(m_oldMultiViewPos, vec2(posx, posy));
+
+	m_Camera.SetZoom(ZoomStuff(minpos, maxpos));
+
+	float multiplier = MultiplierStuff(vec2(posx, posy));
+
+	if(vec2(posx, posy).operator!=(vec2(0, 0)))
+		m_Snap.m_SpecInfo.m_Position = m_oldMultiViewPos + ((vec2(posx, posy) - m_oldMultiViewPos) * multiplier);
+	else
+		m_Snap.m_SpecInfo.m_Position = m_oldMultiViewPos;
+
+	m_oldSpecMultiViewID = m_Snap.m_SpecInfo.m_SpectatorID;
+
+	m_oldMultiViewPos = m_Snap.m_SpecInfo.m_Position;
+	m_Snap.m_SpecInfo.m_UsePosition = true;
+
+	if(m_oldMultiViewPos.operator==(vec2(0, 0)))
+		m_Spectator.Spectate(m_Snap.m_SpecInfo.m_SpectatorID);
+}
+
+void CGameClient::InitMultiViewFromFreeview()
+{
+	if(m_oldSpecMultiViewID != m_Snap.m_SpecInfo.m_SpectatorID || !m_firstMultiViewEntry)
+	{
+		m_firstMultiViewEntry = true;
+
+		CleanIds();
+
+		for(int i = 0; i < MAX_CLIENTS; i++)
+		{
+			// whitelist all players that are rendered (sv_showall 0) !!!!!!
+			if(m_Snap.m_aCharacters[i].m_Cur.m_X != 0 && m_Snap.m_aCharacters[i].m_Cur.m_Y != 0)
+				m_aMultiView[i] = true;
+		}
+
+		SpectateClosest();
+	}
 }
 
 float CGameClient::MultiplierStuff(vec2 camerapos)

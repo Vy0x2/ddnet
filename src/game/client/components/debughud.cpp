@@ -13,8 +13,6 @@
 #include <game/client/gameclient.h>
 #include <game/client/render.h>
 
-//#include "controls.h"
-//#include "camera.h"
 #include "debughud.h"
 
 void CDebugHud::RenderNetCorrections()
@@ -67,13 +65,6 @@ void CDebugHud::RenderNetCorrections()
 	float tmp = str_tofloat(aBuf);
 	int dec = (round_to_int(tmp * 100)) % 100;
 
-	/*if((dec >= 61 && dec <= 66) || (dec >= 31 && dec <= 34))
-	{
-
-		ColorRGBA Color = ColorRGBA(0.0f, 1.0f, 0.0f, 0.8f);
-		TextRender()->TextColor(Color);
-	}*/
-
 	if((dec >= 61 && dec <= 66) || dec == 81)
 	{
 		str_append(aBuf, "↗", sizeof(aBuf));
@@ -83,7 +74,6 @@ void CDebugHud::RenderNetCorrections()
 		str_append(aBuf, "↖", sizeof(aBuf));
 	}
 
-	// dbg_msg("dbg", "aBuf: %s, float: %f, dec: %d", aBuf, tmp, dec);
 	if(dec >= 44 && dec <= 53)
 	{
 		if(dec == 44)
