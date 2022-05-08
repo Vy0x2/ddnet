@@ -101,9 +101,9 @@ void CSpectator::ConMultiView(IConsole::IResult *pResult, void *pUserData)
 	CSpectator *pSelf = (CSpectator *)pUserData;
 	if(pResult->GetInteger(0) == -1)
 	{
-		for(bool id : pSelf->GameClient()->m_aMultiView)
+		for(int i = 0; i < MAX_CLIENTS; i++)
 		{
-			id = false;
+			pSelf->GameClient()->m_aMultiView[i] = false;
 		}
 	}
 	pSelf->GameClient()->m_aMultiView[pResult->GetInteger(0)] = !pSelf->GameClient()->m_aMultiView[pResult->GetInteger(0)];

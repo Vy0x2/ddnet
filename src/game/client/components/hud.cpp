@@ -813,7 +813,7 @@ void CHud::RenderSpectatorHud()
 	str_format(MultiView, sizeof(MultiView), "%s (zoom: %.1f%s (%s), cdist: %.0f, pdist: %.0f, cvel: %.3f, pvel: %.0f, ids: %s)",
 											   version,
 											   (log(m_pClient->m_Camera.m_Zoom) / log(0.866025f)) + 10,
-											   GameClient()->m_isWidthMultiView ? "w" : "h",
+											   GameClient()->m_isWidthMultiView == true ? "w" : "h",
 												GameClient()->m_prMultiViewZoom == 0 ? "auto" : prMulti,
 												GameClient()->m_distView,
 												GameClient()->m_distPlayer,
