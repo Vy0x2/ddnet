@@ -195,6 +195,9 @@ void CCamera::ConZoomPlus(IConsole::IResult *pResult, void *pUserData)
 	if(pSelf->m_pClient->m_Snap.m_SpecInfo.m_Active || pSelf->GameClient()->m_GameInfo.m_AllowZoom || pSelf->Client()->State() == IClient::STATE_DEMOPLAYBACK)
 	{
 		pSelf->ScaleZoom(ZoomStep);
+
+		if(pSelf->GameClient()->m_MultiViewActivated)
+			pSelf->GameClient()->m_MultiViewPersonalZoom++;
 	}
 }
 void CCamera::ConZoomMinus(IConsole::IResult *pResult, void *pUserData)
@@ -203,12 +206,19 @@ void CCamera::ConZoomMinus(IConsole::IResult *pResult, void *pUserData)
 	if(pSelf->m_pClient->m_Snap.m_SpecInfo.m_Active || pSelf->GameClient()->m_GameInfo.m_AllowZoom || pSelf->Client()->State() == IClient::STATE_DEMOPLAYBACK)
 	{
 		pSelf->ScaleZoom(1 / ZoomStep);
+
+		if(pSelf->GameClient()->m_MultiViewActivated)
+			pSelf->GameClient()->m_MultiViewPersonalZoom--;
 	}
 }
 void CCamera::ConZoom(IConsole::IResult *pResult, void *pUserData)
 {
+	CCamera *pSelf = (CCamera *)pUserData;
 	float TargetLevel = pResult->NumArguments() ? pResult->GetFloat(0) : g_Config.m_ClDefaultZoom;
-	((CCamera *)pUserData)->ChangeZoom(pow(ZoomStep, TargetLevel - 10));
+	pSelf->ChangeZoom(pow(ZoomStep, TargetLevel - 10));
+
+	if(pSelf->GameClient()->m_MultiViewActivated)
+		pSelf->GameClient()->m_MultiViewPersonalZoom = 0;
 }
 void CCamera::ConSetView(IConsole::IResult *pResult, void *pUserData)
 {
@@ -217,4 +227,9 @@ void CCamera::ConSetView(IConsole::IResult *pResult, void *pUserData)
 	pSelf->m_ForceFreeviewPos = vec2(
 		clamp(pResult->GetInteger(0) * 32.0f, 200.0f, pSelf->Collision()->GetWidth() * 32 - 200.0f),
 		clamp(pResult->GetInteger(1) * 32.0f, 200.0f, pSelf->Collision()->GetWidth() * 32 - 200.0f));
+}
+
+void CCamera::SetZoom(float Target)
+{
+	ChangeZoom(pow(ZoomStep, Target - 10));
 }
