@@ -64,7 +64,6 @@ void CCamera::ChangeZoom(float Target, int Smoothness)
 	m_ZoomSmoothingTarget = Target;
 	m_ZoomSmoothing = CCubicBezier::With(Current, Derivative, 0, m_ZoomSmoothingTarget);
 	m_ZoomSmoothingStart = Now;
-	int SmoothZoomTime = 250;
 	m_ZoomSmoothingEnd = Now + (float)Smoothness / 1000;
 
 	m_Zooming = true;

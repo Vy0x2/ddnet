@@ -3585,7 +3585,7 @@ float CGameClient::MapValue(float valuemax, float valuemin, float rangemax, floa
 	return (rangemax - rangemin) / (valuemax - valuemin) * (value - valuemin) + rangemin;
 }
 
-void CGameClient::ResetMultiView() 
+void CGameClient::ResetMultiView()
 {
 	m_MultiViewIsInit = false;
 	m_MultiViewPersonalZoom = 0;
