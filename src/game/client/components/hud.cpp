@@ -1533,7 +1533,7 @@ void CHud::RenderSpectatorHud()
 	char prMulti[128];
 	char help[128];
 	char version[128];
-	str_format(version, sizeof(version), "%s", "v5.0");
+	str_format(version, sizeof(version), "%s", "v5.1");
 	str_format(prMulti, sizeof(prMulti), "%s%d", GameClient()->m_MultiViewPersonalZoom > 0 ? "+" : "", GameClient()->m_MultiViewPersonalZoom);
 	str_format(MultiView, sizeof(MultiView), "%s (zoom: %.1f%s (%s), cdist: %.0f, pdist: %.0f, cvel: %.3f, pvel: %.0f, ids: %s)",
 		version,
@@ -1594,7 +1594,7 @@ void CHud::OnRender()
 	Graphics()->MapScreen(0.0f, 0.0f, m_Width, m_Height);
 
 #if defined(CONF_VIDEORECORDER)
-	if((IVideo::Current() && g_Config.m_ClVideoShowhud) || (!IVideo::Current() && g_Config.m_ClShowhud))
+	if(((IVideo::Current() && g_Config.m_ClVideoShowhud) || (!IVideo::Current() && g_Config.m_ClShowhud)))
 #else
 	if(g_Config.m_ClShowhud)
 #endif
@@ -1619,7 +1619,7 @@ void CHud::OnRender()
 			{
 				RenderAmmoHealthAndArmor(&m_pClient->m_Snap.m_aCharacters[SpectatorID].m_Cur);
 			}
-			if(SpectatorID != SPEC_FREEVIEW && m_pClient->m_Snap.m_aCharacters[SpectatorID].m_HasExtendedData && g_Config.m_ClDDRaceHud && GameClient()->m_GameInfo.m_HudDDRace)
+			if(SpectatorID != SPEC_FREEVIEW && m_pClient->m_Snap.m_aCharacters[SpectatorID].m_HasExtendedData && g_Config.m_ClDDRaceHud && (!GameClient()->m_MultiViewActivated || GameClient()->m_MultiViewShowHud) && GameClient()->m_GameInfo.m_HudDDRace)
 			{
 				RenderPlayerState(SpectatorID);
 			}

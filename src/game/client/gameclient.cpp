@@ -597,28 +597,11 @@ void CGameClient::UpdatePositions()
 			m_Snap.m_SpecInfo.m_UsePosition = true;
 		}
 
-		// Multiview disabled so reset zoom smoothness and let the ids be deleted
-		if(!m_MultiViewActivated || (m_MultiViewActivated && m_Snap.m_SpecInfo.m_SpectatorID == SPEC_FREEVIEW))
-		{
-			g_Config.m_ClSmoothZoomTime = 250;
-			m_MultiViewPersonalZoom = 0;
-			m_MultiViewIsInit = false;
-		}
-
-		if(!m_MultiViewActivated && m_Snap.m_SpecInfo.m_SpectatorID != SPEC_FREEVIEW)
-		{
-			CleanIds();
-		}
+		if(!m_MultiViewActivated)
+			ResetMultiView();
 	}
 	else
-	{
-		// Reset zoom smoothness nevertheless and reset personal zoom
-		if(g_Config.m_ClSmoothZoomTime == 2000)
-			g_Config.m_ClSmoothZoomTime = 250;
-
-		m_MultiViewPersonalZoom = 0;
-		m_MultiViewIsInit = false;
-	}
+		ResetMultiView();
 
 	UpdateRenderedCharacters();
 }
@@ -3374,7 +3357,7 @@ void CGameClient::HandleMultiView()
 
 	for(int i = 0; i < MAX_CLIENTS; i++)
 	{
-		if(m_MultiViewIsIdOn && !m_MultiViewId[i]) // special ids activated and not in the list
+		if(idsActivated && !m_MultiViewId[i]) // special ids activated and not in the list
 			continue;
 
 		if(m_Snap.m_aCharacters[i].m_Cur.m_X == 0) // not rendered
@@ -3412,12 +3395,19 @@ void CGameClient::HandleMultiView()
 	float posx = (minpos.x + maxpos.x) / 2.0f;
 	float posy = (minpos.y + maxpos.y) / 2.0f;
 
+	if(amountPlayers == 0)
+		CleanIds();
+
 	m_MultiViewIsIdOn = idsActivated;
-	m_MultiViewPlayerVelocity = tmpVel / (float)amountPlayers;
+	m_MultiViewShowHud = amountPlayers == 1;
 	m_MultiViewPlayerDistance = distance(minpos, maxpos);
 	m_MultiViewCameraDistance = distance(m_MultiViewOldPos, vec2(posx, posy));
+	m_MultiViewPlayerVelocity = clamp(tmpVel / amountPlayers ? (float)amountPlayers : 0, 0.0f, 1000.0f);
 
-	m_Camera.SetZoom(ZoomStuff(minpos, maxpos));
+	if(m_MultiViewOldPersonalZoom == m_MultiViewPersonalZoom)
+		m_Camera.SetZoom(ZoomStuff(minpos, maxpos), 2000);
+	else
+		m_Camera.SetZoom(ZoomStuff(minpos, maxpos), 50);
 
 	float multiplier = MultiplierStuff(vec2(posx, posy));
 
@@ -3438,12 +3428,13 @@ bool CGameClient::InitMultiViewFromFreeview()
 	if(m_MultiViewOldSpecID != m_Snap.m_SpecInfo.m_SpectatorID || !m_MultiViewIsInit)
 	{
 		m_MultiViewIsInit = true;
+		m_MultiViewOldSpecID = m_Snap.m_SpecInfo.m_SpectatorID;
 
 		CleanIds();
 
 		for(int i = 0; i < MAX_CLIENTS; i++)
 		{
-			// whitelist all players that are rendered (sv_showall 0) !!!!!!
+			// whitelist all players that are rendered (sv_showall 0)
 			if(m_Snap.m_aCharacters[i].m_Cur.m_X != 0 && m_Snap.m_aCharacters[i].m_Cur.m_Y != 0)
 			{
 				m_MultiViewId[i] = true;
@@ -3583,12 +3574,6 @@ float CGameClient::ZoomStuff(vec2 minpos, vec2 maxpos)
 
 	zoom = clamp(zoom, -2.5f, 8.0f);
 
-	// preference
-	if(m_MultiViewOldPersonalZoom == m_MultiViewPersonalZoom)
-		g_Config.m_ClSmoothZoomTime = 2000;
-	else
-		g_Config.m_ClSmoothZoomTime = 20;
-
 	zoom = zoom + m_MultiViewPersonalZoom;
 	m_MultiViewOldPersonalZoom = m_MultiViewPersonalZoom;
 
@@ -3598,4 +3583,10 @@ float CGameClient::ZoomStuff(vec2 minpos, vec2 maxpos)
 float CGameClient::MapValue(float valuemax, float valuemin, float rangemax, float rangemin, float value)
 {
 	return (rangemax - rangemin) / (valuemax - valuemin) * (value - valuemin) + rangemin;
+}
+
+void CGameClient::ResetMultiView() 
+{
+	m_MultiViewIsInit = false;
+	m_MultiViewPersonalZoom = 0;
 }

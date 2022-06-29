@@ -30,7 +30,7 @@ class CCamera : public CComponent
 	float m_ZoomSmoothingEnd;
 
 	void ScaleZoom(float Factor);
-	void ChangeZoom(float Target);
+	void ChangeZoom(float Target, int Smoothness);
 	float ZoomProgress(float CurrentTime) const;
 
 	float MinZoomLevel();
@@ -52,7 +52,7 @@ public:
 	virtual void OnConsoleInit() override;
 	virtual void OnReset() override;
 
-	void SetZoom(float Target);
+	void SetZoom(float Target, int Smoothness);
 
 private:
 	static void ConZoomPlus(IConsole::IResult *pResult, void *pUserData);

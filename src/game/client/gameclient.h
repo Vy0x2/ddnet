@@ -695,6 +695,7 @@ public:
 
 	// MultiView public
 	bool m_MultiViewIsIdOn;
+	bool m_MultiViewShowHud;
 	bool m_MultiViewActivated;
 	bool m_MultiViewIsWidthMode;
 	bool m_MultiViewId[MAX_CLIENTS];
@@ -734,7 +735,9 @@ private:
 	float m_LastDummyConnected;
 
 	// MultiView functions
+	void DebugAll();
 	void CleanIds();
+	void ResetMultiView();
 	void SpectateClosest();
 	void HandleMultiView();
 	bool InitMultiViewFromFreeview();
