@@ -32,6 +32,9 @@ class CMenuBackground : public CBackground
 {
 	std::chrono::nanoseconds m_ThemeScanStartTime{0};
 
+protected:
+	bool CanRenderMenuBackground() override { return false; }
+
 public:
 	enum
 	{
@@ -42,7 +45,7 @@ public:
 		POS_SETTINGS_GENERAL,
 		POS_SETTINGS_PLAYER,
 		POS_SETTINGS_TEE,
-		POS_SETTINGS_HUD,
+		POS_SETTINGS_APPEARANCE,
 		POS_SETTINGS_CONTROLS,
 		POS_SETTINGS_GRAPHICS,
 		POS_SETTINGS_SOUND,
