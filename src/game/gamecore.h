@@ -44,7 +44,7 @@ public:
 	CTuningParams()
 	{
 		const float TicksPerSecond = 50.0f;
-#define MACRO_TUNING_PARAM(Name, ScriptName, Value, Description) m_##Name.Set((int)(Value * 100.0f));
+#define MACRO_TUNING_PARAM(Name, ScriptName, Value, Description) m_##Name.Set((int)((Value)*100.0f));
 #include "tuning.h"
 #undef MACRO_TUNING_PARAM
 	}
@@ -291,7 +291,6 @@ public:
 	void SetTeamsCore(CTeamsCore *pTeams);
 	void SetTeleOuts(std::map<int, std::vector<vec2>> *pTeleOuts);
 	void ReadDDNet(const CNetObj_DDNetCharacter *pObjDDNet);
-	void ReadDDNetDisplayInfo(const CNetObj_DDNetCharacterDisplayInfo *pObjDDNet);
 	bool m_Solo;
 	bool m_Jetpack;
 	bool m_NoCollision;
@@ -306,7 +305,7 @@ public:
 	bool m_HasTelegunGun;
 	bool m_HasTelegunGrenade;
 	bool m_HasTelegunLaser;
-	int m_FreezeTick;
+	int m_FreezeStart;
 	int m_FreezeEnd;
 	bool m_IsInFreeze;
 	bool m_DeepFrozen;
