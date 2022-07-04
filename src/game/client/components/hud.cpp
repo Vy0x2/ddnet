@@ -1524,13 +1524,45 @@ void CHud::RenderSpectatorHud()
 	Graphics()->TextureClear();
 	Graphics()->QuadsBegin();
 	Graphics()->SetColor(0.0f, 0.0f, 0.0f, 0.4f);
-	RenderTools()->DrawRoundRectExt(m_Width - 180.0f, m_Height - 15.0f, 180.0f, 15.0f, 5.0f, CUI::CORNER_TL);
+	RenderTools()->DrawRoundRectExt(m_Width - (g_Config.m_ClMultiViewDebug ? 320.0f : 180.0f), m_Height - 15.0f, 320.0f, 15.0f, 5.0f, CUI::CORNER_TL);
 	Graphics()->QuadsEnd();
 
 	// draw the text
 	char aBuf[128];
-	str_format(aBuf, sizeof(aBuf), "%s: %s", Localize("Spectate"), m_pClient->m_Snap.m_SpecInfo.m_SpectatorID != SPEC_FREEVIEW ? m_pClient->m_aClients[m_pClient->m_Snap.m_SpecInfo.m_SpectatorID].m_aName : Localize("Free-View"));
-	TextRender()->Text(0, m_Width - 174.0f, m_Height - 15.0f + (15.f - 8.f) / 2.f, 8.0f, aBuf, -1.0f);
+	char MultiView[128];
+	char prMulti[128];
+	char help[128];
+	char version[128];
+	str_format(version, sizeof(version), "%s", "v5.2");
+	str_format(prMulti, sizeof(prMulti), "%s%d", GameClient()->m_MultiViewPersonalZoom > 0 ? "+" : "", GameClient()->m_MultiViewPersonalZoom);
+	str_format(MultiView, sizeof(MultiView), "%s (zoom: %.1f%s (%s), cdist: %.0f, pdist: %.0f, cvel: %.3f, pvel: %.0f, ids: %s)",
+		version,
+		(log(m_pClient->m_Camera.m_Zoom) / log(0.866025f)) + 10,
+		GameClient()->m_MultiViewIsWidthMode ? "w" : "h",
+		GameClient()->m_MultiViewPersonalZoom == 0 ? "auto" : prMulti,
+		GameClient()->m_MultiViewCameraDistance,
+		GameClient()->m_MultiViewPlayerDistance,
+		GameClient()->m_MultiViewMultiplier,
+		GameClient()->m_MultiViewPlayerVelocity,
+		GameClient()->m_MultiViewIsIdOn ? "yes" : "no");
+	str_format(help, sizeof(help), "%s", m_pClient->m_Snap.m_SpecInfo.m_SpectatorID != SPEC_FREEVIEW ? (GameClient()->m_MultiViewActivated ? MultiView : m_pClient->m_aClients[m_pClient->m_Snap.m_SpecInfo.m_SpectatorID].m_aName) : Localize("Free-View"));
+
+	if(g_Config.m_ClMultiViewDebug)
+	{
+		str_format(aBuf, sizeof(aBuf), "%s%s %s",
+			(GameClient()->m_MultiViewActivated ? "" : Localize("Spectate")),
+			GameClient()->m_MultiViewActivated ? "" : ":",
+			help);
+	}
+	else
+	{
+		str_format(aBuf, sizeof(aBuf), "%s: %s %s",
+			Localize("Spectate"),
+			m_pClient->m_Snap.m_SpecInfo.m_SpectatorID != SPEC_FREEVIEW ? (GameClient()->m_MultiViewActivated ? "Multi-View" : m_pClient->m_aClients[m_pClient->m_Snap.m_SpecInfo.m_SpectatorID].m_aName) : Localize("Free-View"),
+			GameClient()->m_MultiViewActivated ? version : "");
+	}
+
+	TextRender()->Text(0, m_Width - (g_Config.m_ClMultiViewDebug ? 314.0f : 174.0f), m_Height - 15.0f + (15.f - 8.f) / 2.f, 8.0f, aBuf, -1.0f);
 }
 
 void CHud::RenderLocalTime(float x)
@@ -1562,7 +1594,7 @@ void CHud::OnRender()
 	Graphics()->MapScreen(0.0f, 0.0f, m_Width, m_Height);
 
 #if defined(CONF_VIDEORECORDER)
-	if((IVideo::Current() && g_Config.m_ClVideoShowhud) || (!IVideo::Current() && g_Config.m_ClShowhud))
+	if(((IVideo::Current() && g_Config.m_ClVideoShowhud) || (!IVideo::Current() && g_Config.m_ClShowhud)))
 #else
 	if(g_Config.m_ClShowhud)
 #endif
@@ -1587,7 +1619,7 @@ void CHud::OnRender()
 			{
 				RenderAmmoHealthAndArmor(&m_pClient->m_Snap.m_aCharacters[SpectatorID].m_Cur);
 			}
-			if(SpectatorID != SPEC_FREEVIEW && m_pClient->m_Snap.m_aCharacters[SpectatorID].m_HasExtendedData && g_Config.m_ClShowhudDDRace && GameClient()->m_GameInfo.m_HudDDRace)
+			if(SpectatorID != SPEC_FREEVIEW && m_pClient->m_Snap.m_aCharacters[SpectatorID].m_HasExtendedData && g_Config.m_ClShowhudDDRace && (!GameClient()->m_MultiViewActivated || GameClient()->m_MultiViewShowHud) && GameClient()->m_GameInfo.m_HudDDRace)
 			{
 				RenderPlayerState(SpectatorID);
 			}
