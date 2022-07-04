@@ -55,11 +55,6 @@
 
 #include <engine/client/demoedit.h>
 
-#if defined(CONF_FAMILY_WINDOWS)
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#endif
-
 #include "client.h"
 #include "friends.h"
 #include "serverbrowser.h"
@@ -2386,10 +2381,10 @@ void CClient::FinishDDNetInfo()
 	}
 }
 
-typedef std::tuple<int, int, int> Version;
-static const Version InvalidVersion = std::make_tuple(-1, -1, -1);
+typedef std::tuple<int, int, int> TVersion;
+static const TVersion InvalidVersion = std::make_tuple(-1, -1, -1);
 
-Version ToVersion(char *pStr)
+TVersion ToVersion(char *pStr)
 {
 	int version[3] = {0, 0, 0};
 	const char *p = strtok(pStr, ".");
