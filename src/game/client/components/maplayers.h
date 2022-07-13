@@ -137,6 +137,9 @@ class CMapLayers : public CComponent
 protected:
 	virtual bool CanRenderMenuBackground() { return true; }
 
+protected:
+	virtual bool CanRenderMenuBackground() { return true; }
+
 public:
 	enum
 	{

@@ -935,7 +935,6 @@ void CMenus::RenderLoading(const char *pCaption, const char *pContent, int Incre
 	Box.HSplitTop(20.f, &Part, &Box);
 	Box.HSplitTop(24.f, &Part, &Box);
 	Part.VMargin(20.f, &Part);
-
 	Props.m_MaxWidth = (int)Part.w;
 	UI()->DoLabel(&Part, pContent, 20.0f, TEXTALIGN_CENTER);
 
@@ -1474,6 +1473,29 @@ int CMenus::Render()
 			else if(Client()->State() == IClient::STATE_LOADING)
 			{
 				UseIpLabel = false;
+				if(Client()->LoadingStateDetail() == IClient::LOADING_STATE_DETAIL_INITIAL)
+				{
+					pTitle = Localize("Connected");
+					pExtraText = Localize("Getting game info");
+				}
+				else if(Client()->LoadingStateDetail() == IClient::LOADING_STATE_DETAIL_LOADING_MAP)
+				{
+					pTitle = Localize("Connected");
+					pExtraText = Localize("Loading map file from storage");
+				}
+				else if(Client()->LoadingStateDetail() == IClient::LOADING_STATE_DETAIL_SENDING_READY)
+				{
+					pTitle = Localize("Connected");
+					pExtraText = Localize("Requesting to join the game");
+				}
+				else if(Client()->LoadingStateDetail() == IClient::LOADING_STATE_DETAIL_GETTING_READY)
+				{
+					pTitle = Localize("Connected");
+					pExtraText = Localize("Sending intial client info");
+				}
+			}
+			else if(Client()->State() == IClient::STATE_LOADING)
+			{
 				if(Client()->LoadingStateDetail() == IClient::LOADING_STATE_DETAIL_INITIAL)
 				{
 					pTitle = Localize("Connected");
