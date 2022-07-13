@@ -2101,16 +2101,6 @@ void CClient::ProcessServerPacket(CNetChunk *pPacket, int Conn, bool Dummy)
 						return;
 					}
 
-					// create a verified and unpacked snapshot
-					unsigned char aAltSnapBuffer[CSnapshot::MAX_SIZE];
-					CSnapshot *pAltSnapBuffer = (CSnapshot *)aAltSnapBuffer;
-					const int AltSnapSize = UnpackAndValidateSnapshot(pTmpBuffer3, pAltSnapBuffer);
-					if(AltSnapSize < 0)
-					{
-						dbg_msg("client", "unpack snapshot and validate failed!=%d", AltSnapSize);
-						return;
-					}
-
 					// add new
 					m_aSnapshotStorage[Conn].Add(GameTick, time_get(), SnapSize, pTmpBuffer3, AltSnapSize, pAltSnapBuffer);
 
