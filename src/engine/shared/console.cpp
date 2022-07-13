@@ -702,7 +702,7 @@ void CConsole::ConCommandStatus(IResult *pResult, void *pUser)
 			{
 				pConsole->Print(OUTPUT_LEVEL_STANDARD, "chatresp", aBuf);
 				mem_zero(aBuf, sizeof(aBuf));
-				str_copy(aBuf, pCommand->m_pName, sizeof(aBuf));
+				str_copy(aBuf, pCommand->m_pName);
 				Used = Length;
 			}
 		}
@@ -1021,8 +1021,8 @@ void CConsole::Init()
 
 #define MACRO_CONFIG_STR(Name, ScriptName, Len, Def, Flags, Desc) \
 	{ \
-		static char OldValue[Len] = Def; \
-		static CStrVariableData Data = {this, g_Config.m_##Name, Len, OldValue}; \
+		static char s_aOldValue[Len] = Def; \
+		static CStrVariableData Data = {this, g_Config.m_##Name, Len, s_aOldValue}; \
 		Register(#ScriptName, "?r", Flags, StrVariableCommand, &Data, Desc " (default: " #Def ", max length: " #Len ")"); \
 	}
 

@@ -77,7 +77,7 @@ CMenus::CMenus()
 	m_DeletePressed = false;
 	m_NumInputEvents = 0;
 
-	str_copy(m_aCurrentDemoFolder, "demos", sizeof(m_aCurrentDemoFolder));
+	str_copy(m_aCurrentDemoFolder, "demos");
 	m_aCallvoteReason[0] = 0;
 
 	m_FriendlistSelectedIndex = -1;
@@ -442,12 +442,12 @@ int CMenus::DoButton_CheckBox_Number(const void *pID, const char *pText, int Che
 	return DoButton_CheckBox_Common(pID, pText, aBuf, pRect);
 }
 
-int CMenus::DoValueSelector(void *pID, CUIRect *pRect, const char *pLabel, bool UseScroll, int Current, int Min, int Max, int Step, float Scale, bool IsHex, float Round, ColorRGBA *Color)
+int CMenus::DoValueSelector(void *pID, CUIRect *pRect, const char *pLabel, bool UseScroll, int Current, int Min, int Max, int Step, float Scale, bool IsHex, float Round, ColorRGBA *pColor)
 {
 	// logic
 	static float s_Value;
-	static char s_NumStr[64];
-	static void *s_LastTextpID = pID;
+	static char s_aNumStr[64];
+	static void *s_pLastTextpID = pID;
 	const bool Inside = UI()->MouseInside(pRect);
 
 	if(Inside)
@@ -455,12 +455,12 @@ int CMenus::DoValueSelector(void *pID, CUIRect *pRect, const char *pLabel, bool 
 
 	if(UI()->MouseButtonReleased(1) && UI()->HotItem() == pID)
 	{
-		s_LastTextpID = pID;
+		s_pLastTextpID = pID;
 		ms_ValueSelectorTextMode = true;
 		if(IsHex)
-			str_format(s_NumStr, sizeof(s_NumStr), "%06X", Current);
+			str_format(s_aNumStr, sizeof(s_aNumStr), "%06X", Current);
 		else
-			str_format(s_NumStr, sizeof(s_NumStr), "%d", Current);
+			str_format(s_aNumStr, sizeof(s_aNumStr), "%d", Current);
 	}
 
 	if(UI()->CheckActiveItem(pID))
@@ -473,10 +473,10 @@ int CMenus::DoValueSelector(void *pID, CUIRect *pRect, const char *pLabel, bool 
 		}
 	}
 
-	if(ms_ValueSelectorTextMode && s_LastTextpID == pID)
+	if(ms_ValueSelectorTextMode && s_pLastTextpID == pID)
 	{
 		static float s_NumberBoxID = 0;
-		UIEx()->DoEditBox(&s_NumberBoxID, pRect, s_NumStr, sizeof(s_NumStr), 10.0f, &s_NumberBoxID, false, CUI::CORNER_ALL);
+		UIEx()->DoEditBox(&s_NumberBoxID, pRect, s_aNumStr, sizeof(s_aNumStr), 10.0f, &s_NumberBoxID, false, CUI::CORNER_ALL);
 
 		UI()->SetActiveItem(&s_NumberBoxID);
 
@@ -484,9 +484,9 @@ int CMenus::DoValueSelector(void *pID, CUIRect *pRect, const char *pLabel, bool 
 			((UI()->MouseButtonClicked(1) || UI()->MouseButtonClicked(0)) && !Inside))
 		{
 			if(IsHex)
-				Current = clamp(str_toint_base(s_NumStr, 16), Min, Max);
+				Current = clamp(str_toint_base(s_aNumStr, 16), Min, Max);
 			else
-				Current = clamp(str_toint(s_NumStr), Min, Max);
+				Current = clamp(str_toint(s_aNumStr), Min, Max);
 			//m_LockMouse = false;
 			UI()->SetActiveItem(nullptr);
 			ms_ValueSelectorTextMode = false;
@@ -556,14 +556,14 @@ int CMenus::DoValueSelector(void *pID, CUIRect *pRect, const char *pLabel, bool 
 			else
 				str_format(aBuf, sizeof(aBuf), "%d", Current);
 		}
-		RenderTools()->DrawUIRect(pRect, *Color, CUI::CORNER_ALL, Round);
+		RenderTools()->DrawUIRect(pRect, *pColor, CUI::CORNER_ALL, Round);
 		UI()->DoLabel(pRect, aBuf, 10, TEXTALIGN_CENTER);
 	}
 
 	return Current;
 }
 
-int CMenus::DoKeyReader(void *pID, const CUIRect *pRect, int Key, int ModifierCombination, int *NewModifierCombination)
+int CMenus::DoKeyReader(void *pID, const CUIRect *pRect, int Key, int ModifierCombination, int *pNewModifierCombination)
 {
 	// process
 	static void *pGrabbedID = 0;
@@ -571,7 +571,7 @@ int CMenus::DoKeyReader(void *pID, const CUIRect *pRect, int Key, int ModifierCo
 	static int s_ButtonUsed = 0;
 	const bool Inside = UI()->MouseHovered(pRect);
 	int NewKey = Key;
-	*NewModifierCombination = ModifierCombination;
+	*pNewModifierCombination = ModifierCombination;
 
 	if(!UI()->MouseButton(0) && !UI()->MouseButton(1) && pGrabbedID == pID)
 		MouseReleased = true;
@@ -584,7 +584,7 @@ int CMenus::DoKeyReader(void *pID, const CUIRect *pRect, int Key, int ModifierCo
 			if(m_Binder.m_Key.m_Key != KEY_ESCAPE)
 			{
 				NewKey = m_Binder.m_Key.m_Key;
-				*NewModifierCombination = m_Binder.m_ModifierCombination;
+				*pNewModifierCombination = m_Binder.m_ModifierCombination;
 			}
 			m_Binder.m_GotKey = false;
 			UI()->SetActiveItem(nullptr);
@@ -630,8 +630,8 @@ int CMenus::DoKeyReader(void *pID, const CUIRect *pRect, int Key, int ModifierCo
 		if(Key)
 		{
 			char aBuf[64];
-			if(*NewModifierCombination)
-				str_format(aBuf, sizeof(aBuf), "%s%s", CBinds::GetKeyBindModifiersName(*NewModifierCombination), Input()->KeyName(Key));
+			if(*pNewModifierCombination)
+				str_format(aBuf, sizeof(aBuf), "%s%s", CBinds::GetKeyBindModifiersName(*pNewModifierCombination), Input()->KeyName(Key));
 			else
 				str_format(aBuf, sizeof(aBuf), "%s", Input()->KeyName(Key));
 
@@ -935,18 +935,11 @@ void CMenus::RenderLoading(const char *pCaption, const char *pContent, int Incre
 	Box.HSplitTop(20.f, &Part, &Box);
 	Box.HSplitTop(24.f, &Part, &Box);
 	Part.VMargin(20.f, &Part);
-
 	Props.m_MaxWidth = (int)Part.w;
 	UI()->DoLabel(&Part, pContent, 20.0f, TEXTALIGN_CENTER);
 
 	if(RenderLoadingBar)
-	{
-		Graphics()->TextureClear();
-		Graphics()->QuadsBegin();
-		Graphics()->SetColor(1, 1, 1, 0.75f);
-		RenderTools()->DrawRoundRect(Box.x + 40, Box.y + Box.h - 75, (Box.w - 80) * Percent, 25, 5.0f);
-		Graphics()->QuadsEnd();
-	}
+		RenderTools()->DrawRect(Box.x + 40, Box.y + Box.h - 75, (Box.w - 80) * Percent, 25, ColorRGBA(1.0f, 1.0f, 1.0f, 0.75f), CUI::CORNER_ALL, 5.0f);
 
 	Client()->UpdateAndSwap();
 }
@@ -1046,9 +1039,9 @@ void CMenus::PopupMessage(const char *pTopic, const char *pBody, const char *pBu
 	// reset active item
 	UI()->SetActiveItem(nullptr);
 
-	str_copy(m_aMessageTopic, pTopic, sizeof(m_aMessageTopic));
-	str_copy(m_aMessageBody, pBody, sizeof(m_aMessageBody));
-	str_copy(m_aMessageButton, pButton, sizeof(m_aMessageButton));
+	str_copy(m_aMessageTopic, pTopic);
+	str_copy(m_aMessageBody, pBody);
+	str_copy(m_aMessageButton, pButton);
 	m_Popup = POPUP_MESSAGE;
 }
 
@@ -1059,9 +1052,9 @@ void CMenus::PopupWarning(const char *pTopic, const char *pBody, const char *pBu
 	// reset active item
 	UI()->SetActiveItem(nullptr);
 
-	str_copy(m_aMessageTopic, pTopic, sizeof(m_aMessageTopic));
-	str_copy(m_aMessageBody, pBody, sizeof(m_aMessageBody));
-	str_copy(m_aMessageButton, pButton, sizeof(m_aMessageButton));
+	str_copy(m_aMessageTopic, pTopic);
+	str_copy(m_aMessageBody, pBody);
+	str_copy(m_aMessageButton, pButton);
 	m_Popup = POPUP_WARNING;
 	SetActive(true);
 
@@ -1164,14 +1157,14 @@ void CMenus::RenderColorPicker()
 	rgb = color_cast<ColorRGBA, ColorHSVA>(ColorHSVA(PickerColorHSV.x, 1.0f, 1.0f));
 	vec4 BR(rgb.r, rgb.g, rgb.b, 1.0f);
 
-	RenderTools()->DrawUIRect4NoRounding(&ColorsArea, TL, TR, BL, BR);
+	RenderTools()->DrawUIRect4(&ColorsArea, TL, TR, BL, BR, CUI::CORNER_NONE, 0.0f);
 
 	TL = vec4(0.0f, 0.0f, 0.0f, 0.0f);
 	TR = vec4(0.0f, 0.0f, 0.0f, 0.0f);
 	BL = vec4(0.0f, 0.0f, 0.0f, 1.0f);
 	BR = vec4(0.0f, 0.0f, 0.0f, 1.0f);
 
-	RenderTools()->DrawUIRect4NoRounding(&ColorsArea, TL, TR, BL, BR);
+	RenderTools()->DrawUIRect4(&ColorsArea, TL, TR, BL, BR, CUI::CORNER_NONE, 0.0f);
 
 	// Hue Area
 	static const float s_aColorIndices[7][3] = {
@@ -1194,7 +1187,7 @@ void CMenus::RenderColorPicker()
 		BL = vec4(s_aColorIndices[j + 1][0], s_aColorIndices[j + 1][1], s_aColorIndices[j + 1][2], 1.0f);
 
 		HuePartialArea.y = HueArea.y + HuePickerOffset * j;
-		RenderTools()->DrawUIRect4NoRounding(&HuePartialArea, TL, TL, BL, BL);
+		RenderTools()->DrawUIRect4(&HuePartialArea, TL, TL, BL, BL, CUI::CORNER_NONE, 0.0f);
 	}
 
 	//Editboxes Area
@@ -1436,6 +1429,7 @@ int CMenus::Render()
 		const char *pExtraText = "";
 		const char *pButtonText = "";
 		int ExtraAlign = 0;
+		bool UseIpLabel = false;
 
 		ColorRGBA BgColor = ColorRGBA(0.0f, 0.0f, 0.0f, 0.5f);
 		if(m_Popup == POPUP_MESSAGE)
@@ -1447,40 +1441,58 @@ int CMenus::Render()
 		else if(m_Popup == POPUP_CONNECTING)
 		{
 			pTitle = Localize("Connecting to");
-			pExtraText = Client()->ConnectAddressString();
+			UseIpLabel = true;
 			pButtonText = Localize("Abort");
 			if(Client()->State() == IClient::STATE_CONNECTING && time_get() - Client()->StateStartTime() > time_freq())
 			{
-				int Connectivity = Client()->UdpConnectivity(Client()->ServerAddress().type);
-				const char *pMessage = nullptr;
+				int Connectivity = Client()->UdpConnectivity(Client()->ConnectNetTypes());
 				switch(Connectivity)
 				{
 				case IClient::CONNECTIVITY_UNKNOWN:
 					break;
 				case IClient::CONNECTIVITY_CHECKING:
-					pMessage = Localize("Trying to determine UDP connectivity...");
+					pExtraText = Localize("Trying to determine UDP connectivity...");
 					break;
 				case IClient::CONNECTIVITY_UNREACHABLE:
-					pMessage = Localize("UDP seems to be filtered.");
+					pExtraText = Localize("UDP seems to be filtered.");
 					break;
 				case IClient::CONNECTIVITY_DIFFERING_UDP_TCP_IP_ADDRESSES:
-					pMessage = Localize("UDP and TCP IP addresses seem to be different. Try disabling VPN, proxy or network accelerators.");
+					pExtraText = Localize("UDP and TCP IP addresses seem to be different. Try disabling VPN, proxy or network accelerators.");
 					break;
 				case IClient::CONNECTIVITY_REACHABLE:
-					pMessage = Localize("No answer from server yet.");
+					pExtraText = Localize("No answer from server yet.");
 					break;
-				}
-				if(pMessage)
-				{
-					str_format(aBuf, sizeof(aBuf), "%s\n\n%s", Client()->ConnectAddressString(), pMessage);
-					pExtraText = aBuf;
 				}
 			}
 			else if(Client()->MapDownloadTotalsize() > 0)
 			{
 				str_format(aBuf, sizeof(aBuf), "%s: %s", Localize("Downloading map"), Client()->MapDownloadName());
 				pTitle = aBuf;
-				pExtraText = "";
+				UseIpLabel = false;
+			}
+			else if(Client()->State() == IClient::STATE_LOADING)
+			{
+				UseIpLabel = false;
+				if(Client()->LoadingStateDetail() == IClient::LOADING_STATE_DETAIL_INITIAL)
+				{
+					pTitle = Localize("Connected");
+					pExtraText = Localize("Getting game info");
+				}
+				else if(Client()->LoadingStateDetail() == IClient::LOADING_STATE_DETAIL_LOADING_MAP)
+				{
+					pTitle = Localize("Connected");
+					pExtraText = Localize("Loading map file from storage");
+				}
+				else if(Client()->LoadingStateDetail() == IClient::LOADING_STATE_DETAIL_SENDING_READY)
+				{
+					pTitle = Localize("Connected");
+					pExtraText = Localize("Requesting to join the game");
+				}
+				else if(Client()->LoadingStateDetail() == IClient::LOADING_STATE_DETAIL_GETTING_READY)
+				{
+					pTitle = Localize("Connected");
+					pExtraText = Localize("Sending intial client info");
+				}
 			}
 			else if(Client()->State() == IClient::STATE_LOADING)
 			{
@@ -1531,64 +1543,52 @@ int CMenus::Render()
 		{
 			pTitle = Localize("Delete demo");
 			pExtraText = Localize("Are you sure that you want to delete the demo?");
-			ExtraAlign = -1;
 		}
 		else if(m_Popup == POPUP_RENAME_DEMO)
 		{
 			pTitle = Localize("Rename demo");
-			pExtraText = "";
-			ExtraAlign = -1;
 		}
 #if defined(CONF_VIDEORECORDER)
 		else if(m_Popup == POPUP_RENDER_DEMO)
 		{
 			pTitle = Localize("Render demo");
-			pExtraText = "";
-			ExtraAlign = -1;
 		}
 		else if(m_Popup == POPUP_REPLACE_VIDEO)
 		{
 			pTitle = Localize("Replace video");
 			pExtraText = Localize("File already exists, do you want to overwrite it?");
-			ExtraAlign = -1;
 		}
 #endif
 		else if(m_Popup == POPUP_REMOVE_FRIEND)
 		{
 			pTitle = Localize("Remove friend");
 			pExtraText = Localize("Are you sure that you want to remove the player from your friends list?");
-			ExtraAlign = -1;
 		}
 		else if(m_Popup == POPUP_SOUNDERROR)
 		{
 			pTitle = Localize("Sound error");
 			pExtraText = Localize("The audio device couldn't be initialised.");
 			pButtonText = Localize("Ok");
-			ExtraAlign = -1;
 		}
 		else if(m_Popup == POPUP_PASSWORD)
 		{
 			pTitle = Localize("Password incorrect");
-			pExtraText = "";
 			pButtonText = Localize("Try again");
 		}
 		else if(m_Popup == POPUP_QUIT)
 		{
 			pTitle = Localize("Quit");
 			pExtraText = Localize("Are you sure that you want to quit?");
-			ExtraAlign = -1;
 		}
 		else if(m_Popup == POPUP_DISCONNECT)
 		{
 			pTitle = Localize("Disconnect");
 			pExtraText = Localize("Are you sure that you want to disconnect?");
-			ExtraAlign = -1;
 		}
 		else if(m_Popup == POPUP_DISCONNECT_DUMMY)
 		{
 			pTitle = Localize("Disconnect Dummy");
 			pExtraText = Localize("Are you sure that you want to disconnect your dummy?");
-			ExtraAlign = -1;
 		}
 		else if(m_Popup == POPUP_FIRST_LAUNCH)
 		{
@@ -1609,6 +1609,7 @@ int CMenus::Render()
 			{
 				str_format(aBuf, sizeof(aBuf), Localize("Your nickname '%s' is already used (%d points). Do you still want to use it?"), Client()->PlayerName(), Client()->m_Points);
 				pExtraText = aBuf;
+				ExtraAlign = -1;
 			}
 			else if(Client()->m_Points >= 0)
 			{
@@ -1618,7 +1619,6 @@ int CMenus::Render()
 			{
 				pExtraText = Localize("Checking for existing player with your name");
 			}
-			ExtraAlign = -1;
 		}
 		else if(m_Popup == POPUP_WARNING)
 		{
@@ -1632,7 +1632,6 @@ int CMenus::Render()
 		{
 			pTitle = Localize("Disconnect");
 			pExtraText = Localize("Are you sure that you want to disconnect and switch to a different server?");
-			ExtraAlign = -1;
 		}
 
 		CUIRect Box, Part;
@@ -1648,15 +1647,24 @@ int CMenus::Render()
 		Part.VMargin(20.f, &Part);
 		SLabelProperties Props;
 		Props.m_MaxWidth = (int)Part.w;
+
 		if(TextRender()->TextWidth(0, 24.f, pTitle, -1, -1.0f) > Part.w)
 			UI()->DoLabel(&Part, pTitle, 24.f, TEXTALIGN_LEFT, Props);
 		else
 			UI()->DoLabel(&Part, pTitle, 24.f, TEXTALIGN_CENTER);
+
 		Box.HSplitTop(20.f, &Part, &Box);
 		Box.HSplitTop(24.f, &Part, &Box);
 		Part.VMargin(20.f, &Part);
 
 		float FontSize = m_Popup == POPUP_FIRST_LAUNCH ? 16.0f : 20.f;
+
+		if(UseIpLabel)
+		{
+			UI()->DoLabel(&Part, Client()->ConnectAddressString(), FontSize, TEXTALIGN_CENTER);
+			Box.HSplitTop(20.f, &Part, &Box);
+			Box.HSplitTop(24.f, &Part, &Box);
+		}
 
 		Props.m_MaxWidth = (int)Part.w;
 		if(ExtraAlign == -1)
@@ -2046,7 +2054,7 @@ int CMenus::Render()
 						str_format(aBufNew, sizeof(aBufNew), "%s", m_aCurrentDemoFile);
 					char aWholePath[1024];
 					// store new video filename to origin buffer
-					str_copy(m_aCurrentDemoFile, aBufNew, sizeof(m_aCurrentDemoFile));
+					str_copy(m_aCurrentDemoFile, aBufNew);
 					if(Storage()->FindFile(m_aCurrentDemoFile, "videos", IStorage::TYPE_ALL, aWholePath, sizeof(aWholePath)))
 					{
 						PopupMessage(Localize("Error"), Localize("Destination file already exist"), Localize("Ok"));
@@ -2366,11 +2374,11 @@ void CMenus::RenderThemeSelection(CUIRect MainView, bool Header)
 
 		char aName[128];
 		if(Theme.m_Name.empty())
-			str_copy(aName, "(none)", sizeof(aName));
+			str_copy(aName, "(none)");
 		else if(str_comp(Theme.m_Name.c_str(), "auto") == 0)
-			str_copy(aName, "(seasons)", sizeof(aName));
+			str_copy(aName, "(seasons)");
 		else if(str_comp(Theme.m_Name.c_str(), "rand") == 0)
-			str_copy(aName, "(random)", sizeof(aName));
+			str_copy(aName, "(random)");
 		else if(Theme.m_HasDay && Theme.m_HasNight)
 			str_format(aName, sizeof(aName), "%s", Theme.m_Name.c_str());
 		else if(Theme.m_HasDay && !Theme.m_HasNight)
@@ -2663,19 +2671,20 @@ bool CMenus::CheckHotKey(int Key) const
 	       Input()->KeyIsPressed(Key) && m_pClient->m_GameConsole.IsClosed();
 }
 
-int CMenus::DoButton_CheckBox_DontCare(const void *pID, const char *pText, int Checked, const CUIRect *pRect)
+int CMenus::DoButton_CheckBox_Tristate(const void *pID, const char *pText, TRISTATE Checked, const CUIRect *pRect)
 {
 	switch(Checked)
 	{
-	case 0:
+	case TRISTATE::NONE:
 		return DoButton_CheckBox_Common(pID, pText, "", pRect);
-	case 1:
-		return DoButton_CheckBox_Common(pID, pText, "X", pRect);
-	case 2:
+	case TRISTATE::SOME:
 		return DoButton_CheckBox_Common(pID, pText, "O", pRect);
+	case TRISTATE::ALL:
+		return DoButton_CheckBox_Common(pID, pText, "X", pRect);
 	default:
-		return DoButton_CheckBox_Common(pID, pText, "", pRect);
+		dbg_assert(false, "invalid tristate");
 	}
+	dbg_break();
 }
 
 int CMenus::MenuImageScan(const char *pName, int IsDir, int DirType, void *pUser)
@@ -2710,7 +2719,7 @@ int CMenus::MenuImageScan(const char *pName, int IsDir, int DirType, void *pUser
 		CMenuImage MenuImage;
 		MenuImage.m_OrgTexture = pSelf->Graphics()->LoadTextureRaw(Info.m_Width, Info.m_Height, Info.m_Format, Info.m_pData, Info.m_Format, 0);
 
-		unsigned char *d = (unsigned char *)Info.m_pData;
+		unsigned char *pData = (unsigned char *)Info.m_pData;
 		//int Pitch = Info.m_Width*4;
 
 		// create colorless version
@@ -2719,10 +2728,10 @@ int CMenus::MenuImageScan(const char *pName, int IsDir, int DirType, void *pUser
 		// make the texture gray scale
 		for(int i = 0; i < Info.m_Width * Info.m_Height; i++)
 		{
-			int v = (d[i * Step] + d[i * Step + 1] + d[i * Step + 2]) / 3;
-			d[i * Step] = v;
-			d[i * Step + 1] = v;
-			d[i * Step + 2] = v;
+			int v = (pData[i * Step] + pData[i * Step + 1] + pData[i * Step + 2]) / 3;
+			pData[i * Step] = v;
+			pData[i * Step + 1] = v;
+			pData[i * Step + 2] = v;
 		}
 
 		MenuImage.m_GreyTexture = pSelf->Graphics()->LoadTextureRaw(Info.m_Width, Info.m_Height, Info.m_Format, Info.m_pData, Info.m_Format, 0);
