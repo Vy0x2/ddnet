@@ -600,7 +600,17 @@ void CGameClient::UpdatePositions()
 	// spectator position
 	if(m_Snap.m_SpecInfo.m_Active)
 	{
-		if(Client()->State() == IClient::STATE_DEMOPLAYBACK && m_DemoSpecID != SPEC_FOLLOW && m_Snap.m_SpecInfo.m_SpectatorID != SPEC_FREEVIEW)
+		if(!m_MultiViewIsInit && m_MultiViewActivated && m_Snap.m_SpecInfo.m_SpectatorID == SPEC_FREEVIEW)
+		{
+			// Pick a player out of freeview
+			if(!InitMultiViewFromFreeview())
+				dbg_msg("MultiView", "No players found to spectate");
+		}
+		else if(m_MultiViewActivated)
+		{
+			HandleMultiView();
+		}
+		else if(Client()->State() == IClient::STATE_DEMOPLAYBACK && m_DemoSpecID != SPEC_FOLLOW && m_Snap.m_SpecInfo.m_SpectatorID != SPEC_FREEVIEW)
 		{
 			m_Snap.m_SpecInfo.m_Position = mix(
 				vec2(m_Snap.m_aCharacters[m_Snap.m_SpecInfo.m_SpectatorID].m_Prev.m_X, m_Snap.m_aCharacters[m_Snap.m_SpecInfo.m_SpectatorID].m_Prev.m_Y),
@@ -616,7 +626,17 @@ void CGameClient::UpdatePositions()
 			else
 				m_Snap.m_SpecInfo.m_Position = vec2(m_Snap.m_pSpectatorInfo->m_X, m_Snap.m_pSpectatorInfo->m_Y);
 			m_Snap.m_SpecInfo.m_UsePosition = true;
+
+			CleanIds();
 		}
+
+		if(!m_MultiViewActivated)
+			ResetMultiView();
+	}
+	else
+	{
+		ResetMultiView();
+		CleanIds();
 	}
 
 	UpdateRenderedCharacters();
@@ -3340,4 +3360,227 @@ void CGameClient::SnapCollectEntities()
 
 		m_vSnapEntities.push_back({Ent.m_Item, Ent.m_pData, pDataEx});
 	}
+}
+
+void CGameClient::HandleMultiView()
+{
+	bool init = false;
+	bool idsActivated = false;
+	float tmpVel = 0.0f;
+	int amountPlayers = 0;
+	vec2 minpos, maxpos;
+
+	for(auto &mvID : m_MultiViewId) // are ids activated = is atleast one id set
+		if(mvID)
+			idsActivated = true;
+
+	m_MultiViewIgnoring = 0;
+
+	for(int i = 0; i < MAX_CLIENTS; i++)
+		if(m_MultiViewVanish[i])
+		{
+			m_MultiViewIgnoring++;
+			if(m_MultiViewLastFreeze[i] + 6.0f <= Client()->LocalTime() && m_aClients[i].m_FreezeEnd == 0)
+			{
+				m_MultiViewVanish[i] = false;
+				m_MultiViewLastFreeze[i] = 0.0f;
+			}
+		}
+
+	for(int i = 0; i < MAX_CLIENTS; i++)
+	{
+		if(idsActivated && !m_MultiViewId[i]) // special ids activated and not in the list
+			continue;
+
+		if(m_MultiViewVanish[i])
+			continue;
+
+		if(!m_Snap.m_aCharacters[i].m_Active) // not active character gone, so dead or disconnected
+		{
+			m_MultiViewId[i] = false;
+			continue;
+		}
+
+		vec2 player = vec2(m_Snap.m_aCharacters[i].m_Cur.m_X, m_Snap.m_aCharacters[i].m_Cur.m_Y);
+		if(distance(m_MultiViewOldPos, player) > 1000 && m_aClients[i].m_FreezeEnd != 0) // too far away and frozen, so not relevant
+		{
+			// dbg_msg("dbg", "player %d, freeze time: %f, local time: %f", i, m_MultiViewLastFreeze[i], Client()->LocalTime());
+			if(m_MultiViewLastFreeze[i] == 0.0f)
+				m_MultiViewLastFreeze[i] = Client()->LocalTime();
+			else
+			{
+				if(m_MultiViewLastFreeze[i] + 3.0f <= Client()->LocalTime())
+					m_MultiViewVanish[i] = true;
+			}
+		}
+		else if(m_MultiViewLastFreeze[i] != 0)
+		{
+			m_MultiViewLastFreeze[i] = 0;
+		}
+
+		if(!init)
+		{
+			minpos = player;
+			maxpos = player;
+			init = true;
+		}
+		else
+		{
+			if(player.x < minpos.x)
+				minpos.x = player.x;
+			if(player.x > maxpos.x)
+				maxpos.x = player.x;
+			if(player.y < minpos.y)
+				minpos.y = player.y;
+			if(player.y > maxpos.y)
+				maxpos.y = player.y;
+		}
+
+		const CNetObj_Character &CurrentCharacter = m_Snap.m_aCharacters[i].m_Cur;
+		tmpVel += (length(vec2(CurrentCharacter.m_VelX / 256.0f, CurrentCharacter.m_VelY / 256.0f)) * 50) / 32.0f;
+		amountPlayers++;
+	}
+
+	vec2 targetPos = vec2((minpos.x + maxpos.x) / 2.0f, (minpos.y + maxpos.y) / 2.0f);
+
+	if(amountPlayers == 0)
+		CleanIds();
+
+	m_MultiViewIsIdOn = idsActivated;
+	m_MultiViewShowHud = amountPlayers == 1;
+	m_MultiViewPlayerDistance = distance(minpos, maxpos);
+	m_MultiViewCameraDistance = distance(m_MultiViewOldPos, targetPos);
+	m_MultiViewPlayerVelocity = clamp(tmpVel / amountPlayers ? tmpVel / (float)amountPlayers : 0, 0.0f, 1000.0f);
+
+	if(m_MultiViewOldPersonalZoom == m_MultiViewPersonalZoom)
+		m_Camera.SetZoom(ZoomStuff(minpos, maxpos), g_Config.m_ClMultiViewZoomSmoothness);
+	else
+		m_Camera.SetZoom(ZoomStuff(minpos, maxpos), 50);
+
+	float multiplier = MultiplierStuff(targetPos);
+
+	if(targetPos.operator!=(vec2(0, 0))) // is this needed?
+		m_Snap.m_SpecInfo.m_Position = m_MultiViewOldPos + ((targetPos - m_MultiViewOldPos) * multiplier);
+	else
+		m_Snap.m_SpecInfo.m_Position = m_MultiViewOldPos;
+
+	m_MultiViewOldSpecID = m_Snap.m_SpecInfo.m_SpectatorID;
+
+	m_MultiViewOldPos = m_Snap.m_SpecInfo.m_Position;
+	m_Snap.m_SpecInfo.m_UsePosition = true;
+}
+
+bool CGameClient::InitMultiViewFromFreeview()
+{
+	bool playerFound = false;
+	m_MultiViewActivated = true;
+	m_MultiViewIsInit = true;
+	m_MultiViewOldSpecID = m_Snap.m_SpecInfo.m_SpectatorID;
+
+	CleanIds();
+
+	// get the current view coordinates
+	float width, height;
+	RenderTools()->CalcScreenParams(Graphics()->ScreenAspect(), m_Camera.m_Zoom, &width, &height);
+	vec2 xAxis = vec2(m_Camera.m_Center.x - (width / 2), m_Camera.m_Center.x + (width / 2));
+	vec2 yAxis = vec2(m_Camera.m_Center.y - (height / 2), m_Camera.m_Center.y + (height / 2));
+
+	for(int i = 0; i < MAX_CLIENTS; i++)
+	{
+		if(m_Snap.m_aCharacters[i].m_Active)
+		{
+			vec2 playerPos = vec2(m_Snap.m_aCharacters[i].m_Cur.m_X, m_Snap.m_aCharacters[i].m_Cur.m_Y);
+
+			if(playerPos.x != 0 && playerPos.y != 0)
+			{
+				if(playerPos.x > xAxis.x && playerPos.x < xAxis.y && playerPos.y > yAxis.x && playerPos.y < yAxis.y)
+				{
+					m_MultiViewId[i] = true;
+					playerFound = true;
+				}
+			}
+		}
+	}
+
+	return playerFound;
+}
+
+float CGameClient::MultiplierStuff(vec2 camerapos)
+{
+	float maxCameraDist = 250.0f;
+	float minCameraDist = 50.0f;
+	float maxVel = 0.1f;
+	float minVel = 0.007f;
+
+	if(m_MultiViewPlayerVelocity > 23)
+		maxCameraDist = maxCameraDist - clamp(MapValue(50, 20, 100, 10, m_MultiViewPlayerVelocity), 0.0f, 100.0f);
+
+	float tmp = distance(m_MultiViewOldPos, camerapos);
+	m_MultiViewMultiplier = clamp(MapValue(maxCameraDist, minCameraDist, maxVel, minVel, tmp) * g_Config.m_ClMultiViewMultiplierBoost, 0.007f, 1.0f);
+
+	return m_MultiViewMultiplier;
+}
+
+void CGameClient::CleanIds()
+{
+	for(auto &mvID : m_MultiViewId)
+		mvID = false;
+
+	for(auto &lastFreeze : m_MultiViewLastFreeze)
+		lastFreeze = 0.0f;
+
+	for(auto &lastVanish : m_MultiViewVanish)
+		lastVanish = false;
+}
+
+float CGameClient::ZoomStuff(vec2 minpos, vec2 maxpos)
+{
+	float ratio = Graphics()->ScreenAspect();
+
+	float maxPlayerDistance;
+	float minPlayerDistance;
+	float maxZoom;
+	float minZoom;
+
+	// X distance
+	maxPlayerDistance = 2500.0f;
+	minPlayerDistance = 100.0f;
+	maxZoom = 1.0f * (powf(ratio, 2.5)); // 16:9 -> 1.777777
+	minZoom = 8.3f;
+
+	float zoomX = MapValue(maxPlayerDistance, minPlayerDistance, maxZoom, minZoom, maxpos.x - minpos.x);
+
+	// Y distance
+	maxPlayerDistance = 2500.0f;
+	minPlayerDistance = 100.0f;
+	maxZoom = 1.0f;
+	minZoom = 8.3f;
+
+	float zoomY = MapValue(maxPlayerDistance, minPlayerDistance, maxZoom, minZoom, maxpos.y - minpos.y);
+
+	// choose zoom
+	float zoom = zoomX < zoomY ? zoomX : zoomY;
+
+	float diff = MapValue(150, 15, -1.5f, 0.0f, m_MultiViewPlayerVelocity);
+
+	zoom = zoom + clamp(diff, -1.5f, 0.0f);
+
+	zoom = clamp(zoom, -3.5f, 9.0f);
+
+	zoom = zoom + m_MultiViewPersonalZoom;
+	m_MultiViewOldPersonalZoom = m_MultiViewPersonalZoom;
+
+	return zoom;
+}
+
+float CGameClient::MapValue(float valuemax, float valuemin, float rangemax, float rangemin, float value)
+{
+	return (rangemax - rangemin) / (valuemax - valuemin) * (value - valuemin) + rangemin;
+}
+
+void CGameClient::ResetMultiView()
+{
+	m_MultiViewActivated = false;
+	m_MultiViewIsInit = false;
+	m_MultiViewPersonalZoom = 0;
 }
