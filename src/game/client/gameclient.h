@@ -699,6 +699,20 @@ public:
 
 	const std::vector<CSnapEntities> &SnapEntities() { return m_vSnapEntities; }
 
+	// MultiView public
+	bool m_MultiViewShowHud;
+	bool m_MultiViewActivated;
+	bool m_MultiViewId[MAX_CLIENTS];
+	bool m_MultiViewVanish[MAX_CLIENTS];
+	int m_MultiViewTeam;
+	int m_MultiViewIgnoring;
+	int m_MultiViewPersonalZoom;
+	float m_MultiViewLastFreeze[MAX_CLIENTS];
+	float m_MultiViewMultiplier;
+	float m_MultiViewCameraDistance;
+	float m_MultiViewPlayerDistance;
+	float m_MultiViewPlayerVelocity;
+
 private:
 	std::vector<CSnapEntities> m_vSnapEntities;
 	void SnapCollectEntities();
@@ -727,6 +741,23 @@ private:
 	float m_LastZoom;
 	float m_LastScreenAspect;
 	bool m_LastDummyConnected;
+
+	// MultiView functions
+	void CleanIds();
+	void ResetMultiView();
+	void HandleMultiView();
+	bool IsIDsActivated();
+	bool InitMultiViewFromFreeview(int m_Team);
+	float MultiplierStuff(vec2 camerapos);
+	float ZoomStuff(vec2 minpos, vec2 maxpos);
+	float MapValue(float valuemax, float valuemin, float rangemax, float rangemin, float value);
+
+	// MultiView private
+	bool m_MultiViewSolo;
+	bool m_MultiViewIsInit;
+	vec2 m_MultiViewOldPos;
+	int m_MultiViewOldSpecID;
+	int m_MultiViewOldPersonalZoom;
 };
 
 ColorRGBA CalculateNameColor(ColorHSLA TextColorHSL);
