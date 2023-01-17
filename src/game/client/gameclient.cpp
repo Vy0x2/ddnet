@@ -980,6 +980,14 @@ void CGameClient::ProcessEvents()
 		{
 			CNetEvent_Death *pEvent = (CNetEvent_Death *)pData;
 			m_Effects.PlayerDeath(vec2(pEvent->m_X, pEvent->m_Y), pEvent->m_ClientID);
+			if(IsIDsActivated())
+			{
+				if(m_MultiViewActivated)
+					m_MultiViewId[pEvent->m_ClientID] = false;
+				
+				if(!IsIDsActivated())
+					m_MultiViewActivated = false;
+			}
 		}
 		else if(Item.m_Type == NETEVENTTYPE_SOUNDWORLD)
 		{
@@ -3370,9 +3378,7 @@ void CGameClient::HandleMultiView()
 	int amountPlayers = 0;
 	vec2 minpos, maxpos;
 
-	for(auto &mvID : m_MultiViewId) // are ids activated = is atleast one id set
-		if(mvID)
-			idsActivated = true;
+	idsActivated = IsIDsActivated();
 
 	m_MultiViewIgnoring = 0;
 
@@ -3394,17 +3400,17 @@ void CGameClient::HandleMultiView()
 
 		if(m_MultiViewVanish[i])
 			continue;
-
-		if(!m_Snap.m_aCharacters[i].m_Active) // not active character gone, so dead or disconnected
-		{
-			m_MultiViewId[i] = false;
+		
+		vec2 player;
+		if(m_Snap.m_aCharacters[i].m_Active) // active
+			player = vec2(m_Snap.m_aCharacters[i].m_Cur.m_X, m_Snap.m_aCharacters[i].m_Cur.m_Y);
+		else if(m_aClients[i].m_Spec) // spec tee (dotted outline)
+			player = m_aClients[i].m_SpecChar;
+		else
 			continue;
-		}
 
-		vec2 player = vec2(m_Snap.m_aCharacters[i].m_Cur.m_X, m_Snap.m_aCharacters[i].m_Cur.m_Y);
-		if(distance(m_MultiViewOldPos, player) > 1000 && m_aClients[i].m_FreezeEnd != 0) // too far away and frozen, so not relevant
+		if(distance(m_MultiViewOldPos, player) > 1100 && m_aClients[i].m_FreezeEnd != 0) // too far away and frozen, so not relevant
 		{
-			// dbg_msg("dbg", "player %d, freeze time: %f, local time: %f", i, m_MultiViewLastFreeze[i], Client()->LocalTime());
 			if(m_MultiViewLastFreeze[i] == 0.0f)
 				m_MultiViewLastFreeze[i] = Client()->LocalTime();
 			else
@@ -3444,9 +3450,8 @@ void CGameClient::HandleMultiView()
 	vec2 targetPos = vec2((minpos.x + maxpos.x) / 2.0f, (minpos.y + maxpos.y) / 2.0f);
 
 	if(amountPlayers == 0)
-		CleanIds();
+		dbg_msg("dbg", "No more players to spectate, this shouldnt happen");
 
-	m_MultiViewIsIdOn = idsActivated;
 	m_MultiViewShowHud = amountPlayers == 1;
 	m_MultiViewPlayerDistance = distance(minpos, maxpos);
 	m_MultiViewCameraDistance = distance(m_MultiViewOldPos, targetPos);
@@ -3487,17 +3492,23 @@ bool CGameClient::InitMultiViewFromFreeview()
 
 	for(int i = 0; i < MAX_CLIENTS; i++)
 	{
-		if(m_Snap.m_aCharacters[i].m_Active)
-		{
-			vec2 playerPos = vec2(m_Snap.m_aCharacters[i].m_Cur.m_X, m_Snap.m_aCharacters[i].m_Cur.m_Y);
+		vec2 playerPos;
 
-			if(playerPos.x != 0 && playerPos.y != 0)
+		if(m_Snap.m_aCharacters[i].m_Active)
+			playerPos = vec2(m_Snap.m_aCharacters[i].m_Cur.m_X, m_Snap.m_aCharacters[i].m_Cur.m_Y);
+		else if(m_aClients[i].m_Spec)
+		{
+			playerPos = m_aClients[i].m_SpecChar;
+		}
+		else
+			continue;
+
+		if(playerPos.x != 0 && playerPos.y != 0)
+		{
+			if(playerPos.x > xAxis.x && playerPos.x < xAxis.y && playerPos.y > yAxis.x && playerPos.y < yAxis.y)
 			{
-				if(playerPos.x > xAxis.x && playerPos.x < xAxis.y && playerPos.y > yAxis.x && playerPos.y < yAxis.y)
-				{
-					m_MultiViewId[i] = true;
-					playerFound = true;
-				}
+				m_MultiViewId[i] = true;
+				playerFound = true;
 			}
 		}
 	}
@@ -3583,4 +3594,13 @@ void CGameClient::ResetMultiView()
 	m_MultiViewActivated = false;
 	m_MultiViewIsInit = false;
 	m_MultiViewPersonalZoom = 0;
+}
+
+bool CGameClient::IsIDsActivated()
+{
+	for(auto &mvID : m_MultiViewId) // are ids activated = is atleast one id set
+		if(mvID)
+			return true;
+
+	return false;
 }

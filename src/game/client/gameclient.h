@@ -700,7 +700,6 @@ public:
 	const std::vector<CSnapEntities> &SnapEntities() { return m_vSnapEntities; }
 
 	// MultiView public
-	bool m_MultiViewIsIdOn;
 	bool m_MultiViewShowHud;
 	bool m_MultiViewActivated;
 	bool m_MultiViewId[MAX_CLIENTS];
@@ -746,6 +745,7 @@ private:
 	void CleanIds();
 	void ResetMultiView();
 	void HandleMultiView();
+	bool IsIDsActivated();
 	bool InitMultiViewFromFreeview();
 	float MultiplierStuff(vec2 camerapos);
 	float ZoomStuff(vec2 minpos, vec2 maxpos);
