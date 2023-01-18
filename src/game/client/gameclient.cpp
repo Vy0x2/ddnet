@@ -603,8 +603,15 @@ void CGameClient::UpdatePositions()
 		if(!m_MultiViewIsInit && m_MultiViewActivated && m_Snap.m_SpecInfo.m_SpectatorID == SPEC_FREEVIEW)
 		{
 			// Pick a player out of freeview
-			if(!InitMultiViewFromFreeview())
+			if(!InitMultiViewFromFreeview(-1))
 				dbg_msg("MultiView", "No players found to spectate");
+		}
+		else if(!m_MultiViewIsInit && m_MultiViewActivated && m_Snap.m_SpecInfo.m_SpectatorID >= 0)
+		{
+			dbg_msg("dbg", "correct path");
+			// Pick all players from the team
+			if(!InitMultiViewFromFreeview(m_Teams.Team(m_Snap.m_SpecInfo.m_SpectatorID)))
+				dbg_msg("MultiView", "No players found to spectate2");
 		}
 		else if(m_MultiViewActivated)
 		{
@@ -3409,6 +3416,12 @@ void CGameClient::HandleMultiView()
 		else
 			continue;
 
+		if(!idsActivated && m_Teams.Team(i) == 0) // no ids and player is not in a team
+		{
+			m_MultiViewActivated = false;
+			return;
+		}
+		
 		if(distance(m_MultiViewOldPos, player) > 1100 && m_aClients[i].m_FreezeEnd != 0) // too far away and frozen, so not relevant
 		{
 			if(m_MultiViewLastFreeze[i] == 0.0f)
@@ -3475,12 +3488,15 @@ void CGameClient::HandleMultiView()
 	m_Snap.m_SpecInfo.m_UsePosition = true;
 }
 
-bool CGameClient::InitMultiViewFromFreeview()
+// m_Team = -1 means freeview, so teams are not important
+bool CGameClient::InitMultiViewFromFreeview(int team)
 {
 	bool playerFound = false;
 	m_MultiViewActivated = true;
 	m_MultiViewIsInit = true;
 	m_MultiViewOldSpecID = m_Snap.m_SpecInfo.m_SpectatorID;
+
+	bool checkTeam = team != -1;
 
 	CleanIds();
 
@@ -3497,15 +3513,23 @@ bool CGameClient::InitMultiViewFromFreeview()
 		if(m_Snap.m_aCharacters[i].m_Active)
 			playerPos = vec2(m_Snap.m_aCharacters[i].m_Cur.m_X, m_Snap.m_aCharacters[i].m_Cur.m_Y);
 		else if(m_aClients[i].m_Spec)
-		{
 			playerPos = m_aClients[i].m_SpecChar;
-		}
 		else
 			continue;
 
 		if(playerPos.x != 0 && playerPos.y != 0)
 		{
-			if(playerPos.x > xAxis.x && playerPos.x < xAxis.y && playerPos.y > yAxis.x && playerPos.y < yAxis.y)
+			if(checkTeam)
+			{
+				if(m_Teams.Team(i) == team)
+				{
+					dbg_msg("dbg", "hello");
+					m_MultiViewId[i] = true;
+					playerFound = true;
+					// switch to free view here
+				}
+			}
+			else if(playerPos.x > xAxis.x && playerPos.x < xAxis.y && playerPos.y > yAxis.x && playerPos.y < yAxis.y)
 			{
 				m_MultiViewId[i] = true;
 				playerFound = true;

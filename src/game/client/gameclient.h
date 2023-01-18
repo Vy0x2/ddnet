@@ -746,7 +746,7 @@ private:
 	void ResetMultiView();
 	void HandleMultiView();
 	bool IsIDsActivated();
-	bool InitMultiViewFromFreeview();
+	bool InitMultiViewFromFreeview(int m_Team);
 	float MultiplierStuff(vec2 camerapos);
 	float ZoomStuff(vec2 minpos, vec2 maxpos);
 	float MapValue(float valuemax, float valuemin, float rangemax, float rangemin, float value);
