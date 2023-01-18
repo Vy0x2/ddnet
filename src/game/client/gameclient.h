@@ -704,8 +704,9 @@ public:
 	bool m_MultiViewActivated;
 	bool m_MultiViewId[MAX_CLIENTS];
 	bool m_MultiViewVanish[MAX_CLIENTS];
-	int m_MultiViewPersonalZoom;
+	int m_MultiViewTeam;
 	int m_MultiViewIgnoring;
+	int m_MultiViewPersonalZoom;
 	float m_MultiViewLastFreeze[MAX_CLIENTS];
 	float m_MultiViewMultiplier;
 	float m_MultiViewCameraDistance;
@@ -754,7 +755,6 @@ private:
 	// MultiView private
 	vec2 m_MultiViewOldPos;
 	bool m_MultiViewIsInit;
-	int m_MultiViewTeam;
 	int m_MultiViewOldSpecID;
 	int m_MultiViewOldPersonalZoom;
 };

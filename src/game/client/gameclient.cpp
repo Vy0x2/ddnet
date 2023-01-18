@@ -605,7 +605,10 @@ void CGameClient::UpdatePositions()
 			m_MultiViewTeam = 0;
 			// Pick a player out of freeview
 			if(!InitMultiViewFromFreeview(-1))
+			{
 				dbg_msg("MultiView", "No players found to spectate");
+				m_MultiViewActivated = false;
+			}
 		}
 		else if(!m_MultiViewIsInit && m_MultiViewActivated && m_Snap.m_SpecInfo.m_SpectatorID >= 0)
 		{
@@ -618,7 +621,10 @@ void CGameClient::UpdatePositions()
 			}
 			// Pick all players from the team
 			if(!InitMultiViewFromFreeview(team))
+			{
 				dbg_msg("MultiView", "No players found to spectate in that team");
+				m_MultiViewActivated = false;
+			}
 		}
 		else if(m_MultiViewActivated)
 		{
@@ -3415,7 +3421,8 @@ void CGameClient::HandleMultiView()
 		if(m_MultiViewVanish[i])
 			continue;
 
-		if(m_Teams.Team(i) != m_MultiViewTeam)
+		// spectating a team specific and the player isnt in the team
+		if(m_MultiViewTeam > 0 && m_Teams.Team(i) != m_MultiViewTeam)
 			continue;
 		
 		vec2 player;
@@ -3467,7 +3474,10 @@ void CGameClient::HandleMultiView()
 	vec2 targetPos = vec2((minpos.x + maxpos.x) / 2.0f, (minpos.y + maxpos.y) / 2.0f);
 
 	if(amountPlayers == 0)
+	{
 		dbg_msg("dbg", "No more players to spectate, this shouldnt happen");
+		m_MultiViewActivated = false;
+	}
 
 	m_MultiViewShowHud = amountPlayers == 1;
 	m_MultiViewPlayerDistance = distance(minpos, maxpos);
@@ -3513,7 +3523,7 @@ bool CGameClient::InitMultiViewFromFreeview(int team)
 	if(team != -1)
 	{
 		m_MultiViewTeam = team;
-		m_Spectator.Spectate(-1);
+		//m_Spectator.Spectate(-1);
 		playerFound = true;
 	}
 	else
