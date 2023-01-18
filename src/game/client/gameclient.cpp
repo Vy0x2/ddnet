@@ -3555,7 +3555,7 @@ float CGameClient::MultiplierStuff(vec2 camerapos)
 {
 	float maxCameraDist = 250.0f;
 	float minCameraDist = 50.0f;
-	float maxVel = 0.7f;
+	float maxVel = 0.1f;
 	float minVel = 0.007f;
 
 	float tmp = distance(m_MultiViewOldPos, camerapos);
