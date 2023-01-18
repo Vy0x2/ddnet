@@ -602,16 +602,23 @@ void CGameClient::UpdatePositions()
 	{
 		if(!m_MultiViewIsInit && m_MultiViewActivated && m_Snap.m_SpecInfo.m_SpectatorID == SPEC_FREEVIEW)
 		{
+			m_MultiViewTeam = 0;
 			// Pick a player out of freeview
 			if(!InitMultiViewFromFreeview(-1))
 				dbg_msg("MultiView", "No players found to spectate");
 		}
 		else if(!m_MultiViewIsInit && m_MultiViewActivated && m_Snap.m_SpecInfo.m_SpectatorID >= 0)
 		{
-			dbg_msg("dbg", "correct path");
+			int team = m_Teams.Team(m_Snap.m_SpecInfo.m_SpectatorID);
+			if(team == 0)
+			{
+				dbg_msg("MultiView", "Cant spectate t0 with no ids");
+				m_MultiViewActivated = false;
+				return;
+			}
 			// Pick all players from the team
-			if(!InitMultiViewFromFreeview(m_Teams.Team(m_Snap.m_SpecInfo.m_SpectatorID)))
-				dbg_msg("MultiView", "No players found to spectate2");
+			if(!InitMultiViewFromFreeview(team))
+				dbg_msg("MultiView", "No players found to spectate in that team");
 		}
 		else if(m_MultiViewActivated)
 		{
@@ -3407,6 +3414,9 @@ void CGameClient::HandleMultiView()
 
 		if(m_MultiViewVanish[i])
 			continue;
+
+		if(m_Teams.Team(i) != m_MultiViewTeam)
+			continue;
 		
 		vec2 player;
 		if(m_Snap.m_aCharacters[i].m_Active) // active
@@ -3415,12 +3425,6 @@ void CGameClient::HandleMultiView()
 			player = m_aClients[i].m_SpecChar;
 		else
 			continue;
-
-		if(!idsActivated && m_Teams.Team(i) == 0) // no ids and player is not in a team
-		{
-			m_MultiViewActivated = false;
-			return;
-		}
 		
 		if(distance(m_MultiViewOldPos, player) > 1100 && m_aClients[i].m_FreezeEnd != 0) // too far away and frozen, so not relevant
 		{
@@ -3506,36 +3510,33 @@ bool CGameClient::InitMultiViewFromFreeview(int team)
 	vec2 xAxis = vec2(m_Camera.m_Center.x - (width / 2), m_Camera.m_Center.x + (width / 2));
 	vec2 yAxis = vec2(m_Camera.m_Center.y - (height / 2), m_Camera.m_Center.y + (height / 2));
 
-	for(int i = 0; i < MAX_CLIENTS; i++)
+	if(team != -1)
 	{
-		vec2 playerPos;
-
-		if(m_Snap.m_aCharacters[i].m_Active)
-			playerPos = vec2(m_Snap.m_aCharacters[i].m_Cur.m_X, m_Snap.m_aCharacters[i].m_Cur.m_Y);
-		else if(m_aClients[i].m_Spec)
-			playerPos = m_aClients[i].m_SpecChar;
-		else
-			continue;
-
-		if(playerPos.x != 0 && playerPos.y != 0)
+		m_MultiViewTeam = team;
+		m_Spectator.Spectate(-1);
+		playerFound = true;
+	}
+	else
+		for(int i = 0; i < MAX_CLIENTS; i++)
 		{
-			if(checkTeam)
+			vec2 playerPos;
+
+			if(m_Snap.m_aCharacters[i].m_Active)
+				playerPos = vec2(m_Snap.m_aCharacters[i].m_Cur.m_X, m_Snap.m_aCharacters[i].m_Cur.m_Y);
+			else if(m_aClients[i].m_Spec)
+				playerPos = m_aClients[i].m_SpecChar;
+			else
+				continue;
+
+			if(playerPos.x != 0 && playerPos.y != 0)
 			{
-				if(m_Teams.Team(i) == team)
+				if(playerPos.x > xAxis.x && playerPos.x < xAxis.y && playerPos.y > yAxis.x && playerPos.y < yAxis.y)
 				{
-					dbg_msg("dbg", "hello");
 					m_MultiViewId[i] = true;
 					playerFound = true;
-					// switch to free view here
 				}
 			}
-			else if(playerPos.x > xAxis.x && playerPos.x < xAxis.y && playerPos.y > yAxis.x && playerPos.y < yAxis.y)
-			{
-				m_MultiViewId[i] = true;
-				playerFound = true;
-			}
 		}
-	}
 
 	return playerFound;
 }
@@ -3543,12 +3544,9 @@ bool CGameClient::InitMultiViewFromFreeview(int team)
 float CGameClient::MultiplierStuff(vec2 camerapos)
 {
 	float maxCameraDist = 250.0f;
-	float minCameraDist = 30.0f;
+	float minCameraDist = 50.0f;
 	float maxVel = 0.7f;
 	float minVel = 0.007f;
-
-	/*if(m_MultiViewPlayerVelocity > 23)
-		maxCameraDist = maxCameraDist - clamp(MapValue(50, 20, 100, 10, m_MultiViewPlayerVelocity), 0.0f, 100.0f);*/
 
 	float tmp = distance(m_MultiViewOldPos, camerapos);
 	m_MultiViewMultiplier = clamp(MapValue(maxCameraDist, minCameraDist, maxVel, minVel, tmp) * g_Config.m_ClMultiViewMultiplierBoost, 0.007f, 1.0f);

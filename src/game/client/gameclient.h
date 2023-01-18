@@ -754,6 +754,7 @@ private:
 	// MultiView private
 	vec2 m_MultiViewOldPos;
 	bool m_MultiViewIsInit;
+	int m_MultiViewTeam;
 	int m_MultiViewOldSpecID;
 	int m_MultiViewOldPersonalZoom;
 };
