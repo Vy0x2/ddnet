@@ -3403,7 +3403,7 @@ void CGameClient::HandleMultiView()
 		
 		vec2 player;
 		if(m_Snap.m_aCharacters[i].m_Active) // active
-			player = vec2(m_Snap.m_aCharacters[i].m_Cur.m_X, m_Snap.m_aCharacters[i].m_Cur.m_Y);
+			player = vec2(m_aClients[i].m_RenderPos.x, m_aClients[i].m_RenderPos.y);
 		else if(m_aClients[i].m_Spec) // spec tee (dotted outline)
 			player = m_aClients[i].m_SpecChar;
 		else
@@ -3519,12 +3519,12 @@ bool CGameClient::InitMultiViewFromFreeview()
 float CGameClient::MultiplierStuff(vec2 camerapos)
 {
 	float maxCameraDist = 250.0f;
-	float minCameraDist = 50.0f;
-	float maxVel = 0.1f;
+	float minCameraDist = 30.0f;
+	float maxVel = 0.7f;
 	float minVel = 0.007f;
 
-	if(m_MultiViewPlayerVelocity > 23)
-		maxCameraDist = maxCameraDist - clamp(MapValue(50, 20, 100, 10, m_MultiViewPlayerVelocity), 0.0f, 100.0f);
+	/*if(m_MultiViewPlayerVelocity > 23)
+		maxCameraDist = maxCameraDist - clamp(MapValue(50, 20, 100, 10, m_MultiViewPlayerVelocity), 0.0f, 100.0f);*/
 
 	float tmp = distance(m_MultiViewOldPos, camerapos);
 	m_MultiViewMultiplier = clamp(MapValue(maxCameraDist, minCameraDist, maxVel, minVel, tmp) * g_Config.m_ClMultiViewMultiplierBoost, 0.007f, 1.0f);
@@ -3554,7 +3554,7 @@ float CGameClient::ZoomStuff(vec2 minpos, vec2 maxpos)
 	float minZoom;
 
 	// X distance
-	maxPlayerDistance = 2500.0f;
+	maxPlayerDistance = 2400.0f;
 	minPlayerDistance = 100.0f;
 	maxZoom = 1.0f * (powf(ratio, 2.5)); // 16:9 -> 1.777777
 	minZoom = 8.3f;
@@ -3562,17 +3562,15 @@ float CGameClient::ZoomStuff(vec2 minpos, vec2 maxpos)
 	float zoomX = MapValue(maxPlayerDistance, minPlayerDistance, maxZoom, minZoom, maxpos.x - minpos.x);
 
 	// Y distance
-	maxPlayerDistance = 2500.0f;
-	minPlayerDistance = 100.0f;
 	maxZoom = 1.0f;
-	minZoom = 8.3f;
 
 	float zoomY = MapValue(maxPlayerDistance, minPlayerDistance, maxZoom, minZoom, maxpos.y - minpos.y);
 
 	// choose zoom
 	float zoom = zoomX < zoomY ? zoomX : zoomY;
 
-	float diff = MapValue(150, 15, -1.5f, 0.0f, m_MultiViewPlayerVelocity);
+	// increase zoom depending on the velocity (average)
+	float diff = MapValue(70, 10, -1.5f, 0.0f, m_MultiViewPlayerVelocity);
 
 	zoom = zoom + clamp(diff, -1.5f, 0.0f);
 
