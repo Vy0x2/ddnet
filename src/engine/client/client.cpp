@@ -3078,7 +3078,9 @@ void CClient::Run()
 	// process pending commands
 	m_pConsole->StoreCommands(false);
 
+#if defined(CONF_FAMILY_UNIX)
 	m_Fifo.Init(m_pConsole, g_Config.m_ClInputFifo, CFGFLAG_CLIENT);
+#endif
 
 	InitChecksum();
 	m_pConsole->InitChecksum(ChecksumData());
@@ -3339,7 +3341,9 @@ void CClient::Run()
 				break;
 		}
 
+#if defined(CONF_FAMILY_UNIX)
 		m_Fifo.Update();
+#endif
 
 		// beNice
 		auto Now = time_get_nanoseconds();
@@ -3391,7 +3395,9 @@ void CClient::Run()
 		m_GlobalTime = (time_get() - m_GlobalStartTime) / (float)time_freq();
 	}
 
+#if defined(CONF_FAMILY_UNIX)
 	m_Fifo.Shutdown();
+#endif
 
 	GameClient()->OnShutdown();
 	Disconnect();
