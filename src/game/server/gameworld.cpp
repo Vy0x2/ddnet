@@ -33,7 +33,7 @@ CGameWorld::~CGameWorld()
 	// delete all entities
 	for(auto &pFirstEntityType : m_apFirstEntityTypes)
 		while(pFirstEntityType)
-			delete pFirstEntityType; // NOLINT(clang-analyzer-cplusplus.NewDelete)
+			delete pFirstEntityType;
 }
 
 void CGameWorld::SetGameServer(CGameContext *pGameServer)
