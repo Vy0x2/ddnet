@@ -28,7 +28,6 @@
 #include <engine/shared/network.h>
 #include <engine/shared/packer.h>
 #include <engine/shared/protocol.h>
-#include <engine/shared/protocol7.h>
 #include <engine/shared/protocol_ex.h>
 #include <engine/shared/rust_version.h>
 #include <engine/shared/snapshot.h>
@@ -750,7 +749,7 @@ static inline bool RepackMsg(const CMsgPacker *pMsg, CPacker &Packer, bool Sixup
 			else if(MsgId >= NETMSG_CON_READY && MsgId <= NETMSG_INPUTTIMING)
 				MsgId += 1;
 			else if(MsgId == NETMSG_RCON_LINE)
-				MsgId = protocol7::NETMSG_RCON_LINE;
+				MsgId = 13;
 			else if(MsgId >= NETMSG_AUTH_CHALLENGE && MsgId <= NETMSG_AUTH_RESULT)
 				MsgId += 4;
 			else if(MsgId >= NETMSG_PING && MsgId <= NETMSG_ERROR)
@@ -1688,7 +1687,7 @@ void CServer::ProcessClientPacket(CNetChunk *pPacket)
 						}
 						else
 						{
-							CMsgPacker Msgp(protocol7::NETMSG_RCON_AUTH_ON, true, true);
+							CMsgPacker Msgp(11, true, true); //NETMSG_RCON_AUTH_ON
 							SendMsg(&Msgp, MSGFLAG_VITAL, ClientID);
 						}
 
@@ -3511,7 +3510,7 @@ void CServer::LogoutClient(int ClientID, const char *pReason)
 	}
 	else
 	{
-		CMsgPacker Msg(protocol7::NETMSG_RCON_AUTH_OFF, true, true);
+		CMsgPacker Msg(12, true, true); //NETMSG_RCON_AUTH_OFF
 		SendMsg(&Msg, MSGFLAG_VITAL, ClientID);
 	}
 
