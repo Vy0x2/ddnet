@@ -423,7 +423,7 @@ void CTeeHistorian::RecordPlayerInput(int ClientID, uint32_t UniqueClientID, con
 		Buffer.Reset();
 
 		Buffer.AddInt(-TEEHISTORIAN_INPUT_DIFF);
-		CSnapshotDelta::DiffItem((int *)&pPrev->m_Input, (int *)pInput, (int *)&DiffInput, sizeof(DiffInput) / sizeof(int32_t));
+		CSnapshotDelta::DiffItem((int *)&pPrev->m_Input, (int *)pInput, (int *)&DiffInput, sizeof(DiffInput) / sizeof(int));
 		if(m_Debug)
 		{
 			const int *pData = (const int *)&DiffInput;
@@ -444,7 +444,7 @@ void CTeeHistorian::RecordPlayerInput(int ClientID, uint32_t UniqueClientID, con
 		}
 	}
 	Buffer.AddInt(ClientID);
-	for(size_t i = 0; i < sizeof(DiffInput) / sizeof(int32_t); i++)
+	for(int i = 0; i < (int)(sizeof(DiffInput) / sizeof(int)); i++)
 	{
 		Buffer.AddInt(((int *)&DiffInput)[i]);
 	}
