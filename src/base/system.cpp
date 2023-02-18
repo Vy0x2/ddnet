@@ -364,12 +364,12 @@ unsigned io_write(IOHANDLE io, const void *buffer, unsigned size)
 	return fwrite(buffer, 1, size, (FILE *)io);
 }
 
-bool io_write_newline(IOHANDLE io)
+unsigned io_write_newline(IOHANDLE io)
 {
 #if defined(CONF_FAMILY_WINDOWS)
-	return io_write(io, "\r\n", 2) == 2;
+	return fwrite("\r\n", 1, 2, (FILE *)io);
 #else
-	return io_write(io, "\n", 1) == 1;
+	return fwrite("\n", 1, 1, (FILE *)io);
 #endif
 }
 
