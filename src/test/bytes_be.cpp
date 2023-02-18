@@ -12,8 +12,8 @@ TEST(BytePacking, RoundtripInt)
 	for(auto i : INT_DATA)
 	{
 		unsigned char aPacked[4];
-		uint_to_bytes_be(aPacked, i);
-		EXPECT_EQ(bytes_be_to_uint(aPacked), i);
+		int_to_bytes_be(aPacked, i);
+		EXPECT_EQ(bytes_be_to_int(aPacked), i);
 	}
 }
 
