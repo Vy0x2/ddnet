@@ -296,15 +296,15 @@ unsigned io_skip(IOHANDLE io, int size);
 unsigned io_write(IOHANDLE io, const void *buffer, unsigned size);
 
 /**
- * Writes a platform dependent newline to file.
+ * Writes newline to file.
  *
  * @ingroup File-IO
  *
  * @param io Handle to the file.
  *
- * @return true on success, false on failure.
+ * @return Number of bytes written.
  */
-bool io_write_newline(IOHANDLE io);
+unsigned io_write_newline(IOHANDLE io);
 
 /**
  * Seeks to a specified offset in the file.
