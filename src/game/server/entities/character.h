@@ -3,7 +3,6 @@
 #ifndef GAME_SERVER_ENTITIES_CHARACTER_H
 #define GAME_SERVER_ENTITIES_CHARACTER_H
 
-#include <base/tl/bitmask.h>
 #include <game/server/entity.h>
 #include <game/server/save.h>
 
@@ -86,7 +85,7 @@ public:
 	bool IsAlive() const { return m_Alive; }
 	bool IsPaused() const { return m_Paused; }
 	class CPlayer *GetPlayer() { return m_pPlayer; }
-	CClientMask TeamMask();
+	int64_t TeamMask();
 
 private:
 	// player controlling this character

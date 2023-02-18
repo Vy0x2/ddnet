@@ -475,16 +475,16 @@ bool CGameTeams::TeamFinished(int Team)
 	return true;
 }
 
-CClientMask CGameTeams::TeamMask(int Team, int ExceptID, int Asker)
+int64_t CGameTeams::TeamMask(int Team, int ExceptID, int Asker)
 {
 	if(Team == TEAM_SUPER)
 	{
 		if(ExceptID == -1)
-			return CClientMask().set();
-		return CClientMask().set().reset(ExceptID);
+			return 0xffffffffffffffff;
+		return 0xffffffffffffffff & ~(1 << ExceptID);
 	}
 
-	CClientMask Mask;
+	int64_t Mask = 0;
 	for(int i = 0; i < MAX_CLIENTS; ++i)
 	{
 		if(i == ExceptID)
@@ -545,7 +545,7 @@ CClientMask CGameTeams::TeamMask(int Team, int ExceptID, int Asker)
 			}
 		}
 
-		Mask.set(i);
+		Mask |= 1LL << i;
 	}
 	return Mask;
 }
@@ -1093,7 +1093,7 @@ void CGameTeams::SetTeamLock(int Team, bool Lock)
 
 void CGameTeams::ResetInvited(int Team)
 {
-	m_aInvited[Team].reset();
+	m_aInvited[Team] = 0;
 }
 
 void CGameTeams::SetClientInvited(int Team, int ClientID, bool Invited)
@@ -1101,9 +1101,9 @@ void CGameTeams::SetClientInvited(int Team, int ClientID, bool Invited)
 	if(Team > TEAM_FLOCK && Team < TEAM_SUPER)
 	{
 		if(Invited)
-			m_aInvited[Team].set(ClientID);
+			m_aInvited[Team] |= 1ULL << ClientID;
 		else
-			m_aInvited[Team].reset(ClientID);
+			m_aInvited[Team] &= ~(1ULL << ClientID);
 	}
 }
 
