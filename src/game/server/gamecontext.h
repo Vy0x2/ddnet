@@ -59,19 +59,6 @@ class IStorage;
 struct CAntibotRoundData;
 struct CScoreRandomMapResult;
 
-struct CSnapContext
-{
-	CSnapContext(int Version) :
-		m_ClientVersion(Version)
-	{
-	}
-
-	int GetClientVersion() const { return m_ClientVersion; }
-
-private:
-	int m_ClientVersion;
-};
-
 class CGameContext : public IGameServer
 {
 	IServer *m_pServer;
@@ -225,8 +212,6 @@ public:
 	void CreateDeath(vec2 Pos, int ClientID, CClientMask Mask = CClientMask().set());
 	void CreateSound(vec2 Pos, int Sound, CClientMask Mask = CClientMask().set());
 	void CreateSoundGlobal(int Sound, int Target = -1);
-
-	bool SnapLaserObject(const CSnapContext &Context, int SnapID, const vec2 &To, const vec2 &From, int StartTick, int Owner = -1, int LaserType = -1);
 
 	enum
 	{
