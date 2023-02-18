@@ -930,7 +930,7 @@ void CGameContext::OnTick()
 						continue;
 
 					// connecting clients with spoofed ips can clog slots without being ingame
-					if(!Server()->ClientIngame(i))
+					if(((CServer *)Server())->m_aClients[i].m_State != CServer::CClient::STATE_INGAME)
 						continue;
 
 					// don't count votes by blacklisted clients
@@ -1507,8 +1507,7 @@ void CGameContext::OnClientConnected(int ClientID, void *pData)
 		bool Empty = true;
 		for(auto &pPlayer : m_apPlayers)
 		{
-			// connecting clients with spoofed ips can clog slots without being ingame
-			if(pPlayer && Server()->ClientIngame(pPlayer->GetCID()))
+			if(pPlayer)
 			{
 				Empty = false;
 				break;
