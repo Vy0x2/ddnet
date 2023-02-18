@@ -168,7 +168,6 @@ void CGameWorld::RemoveEntitiesFromPlayers(int PlayerIds[], int NumPlayers)
 				{
 					RemoveEntity(pEnt);
 					pEnt->Destroy();
-					break;
 				}
 			}
 			pEnt = m_pNextTraverseEntity;
