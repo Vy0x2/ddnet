@@ -32,13 +32,6 @@ public:
 
 	CEventHandler();
 	void *Create(int Type, int Size, CClientMask Mask = CClientMask().set());
-
-	template<typename T>
-	T *Create(CClientMask Mask = CClientMask().set())
-	{
-		return static_cast<T *>(Create(T::ms_MsgID, sizeof(T), Mask));
-	}
-
 	void Clear();
 	void Snap(int SnappingClient);
 
