@@ -703,8 +703,7 @@ int CServer::DistinctClientCount() const
 	int ClientCount = 0;
 	for(int i = 0; i < MAX_CLIENTS; i++)
 	{
-		// connecting clients with spoofed ips can clog slots without being ingame
-		if(ClientIngame(i))
+		if(m_aClients[i].m_State != CClient::STATE_EMPTY)
 		{
 			ClientCount++;
 			for(int j = 0; j < i; j++)
