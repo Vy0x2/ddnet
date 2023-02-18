@@ -214,12 +214,14 @@ int CSnapshotDelta::DiffItem(const int *pPast, const int *pCurrent, int *pOut, i
 	return Needed;
 }
 
-void CSnapshotDelta::UndiffItem(const int *pPast, int *pDiff, int *pOut, int Size, int *pDataRate)
+bool CSnapshotDelta::UndiffItem(const int *pPast, int *pDiff, int *pOut, int Size, int *pDataRate)
 {
 	while(Size)
 	{
-		// addition with wrapping by casting to unsigned
-		*pOut = (unsigned)*pPast + (unsigned)*pDiff;
+		const long OutValue = (long)*pPast + *pDiff;
+		//if(!in_range<long>(OutValue, std::numeric_limits<int>::min(), std::numeric_limits<int>::max()))
+		//	return false;
+		*pOut = (int)OutValue;
 
 		if(*pDiff == 0)
 			*pDataRate += 1;
@@ -235,6 +237,8 @@ void CSnapshotDelta::UndiffItem(const int *pPast, int *pDiff, int *pOut, int Siz
 		pDiff++;
 		Size--;
 	}
+
+	return true;
 }
 
 CSnapshotDelta::CSnapshotDelta()
@@ -442,7 +446,11 @@ int CSnapshotDelta::UnpackDelta(CSnapshot *pFrom, CSnapshot *pTo, const void *pS
 		if(FromIndex != -1)
 		{
 			// we got an update so we need to apply the diff
-			UndiffItem(pFrom->GetItem(FromIndex)->Data(), pData, pNewData, ItemSize / 4, &m_aSnapshotDataRate[Type]);
+			if(!UndiffItem(pFrom->GetItem(FromIndex)->Data(), pData, pNewData, ItemSize / 4, &m_aSnapshotDataRate[Type]))
+			{
+				// TODO: Breaks old client on new server
+				//return -206;
+			}
 		}
 		else // no previous, just copy the pData
 		{
