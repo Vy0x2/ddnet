@@ -403,69 +403,66 @@ int CEditor::PopupLayer(CEditor *pEditor, CUIRect View, void *pContext)
 {
 	CLayerPopupContext *pPopup = (CLayerPopupContext *)pContext;
 
-	CLayerGroup *pCurrentGroup = pEditor->m_Map.m_vpGroups[pEditor->m_SelectedGroup];
-	CLayer *pCurrentLayer = pEditor->GetSelectedLayer(0);
+	// remove layer button
+	CUIRect Button;
+	View.HSplitBottom(12.0f, &View, &Button);
+	static int s_DeleteButton = 0;
 
 	if(pPopup->m_vpLayers.size() > 1)
 	{
 		return CLayerTiles::RenderCommonProperties(pPopup->m_CommonPropState, pEditor, &View, pPopup->m_vpLayers);
 	}
 
-	const bool EntitiesLayer = pCurrentLayer->IsEntitiesLayer();
+	// duplicate layer button
+	CUIRect DupButton;
+	static int s_DuplicationButton = 0;
+	View.HSplitBottom(4.0f, &View, nullptr);
+	View.HSplitBottom(12.0f, &View, &DupButton);
 
-	// delete button
-	if(pEditor->m_Map.m_pGameLayer != pCurrentLayer) // entities layers except the game layer can be deleted
+	if(!pEditor->IsSpecialLayer(pEditor->GetSelectedLayer(0)))
 	{
-		CUIRect DeleteButton;
-		View.HSplitBottom(12.0f, &View, &DeleteButton);
-		static int s_DeleteButton = 0;
-		if(pEditor->DoButton_Editor(&s_DeleteButton, "Delete layer", 0, &DeleteButton, 0, "Deletes the layer"))
-		{
-			if(pCurrentLayer == pEditor->m_Map.m_pFrontLayer)
-				pEditor->m_Map.m_pFrontLayer = nullptr;
-			if(pCurrentLayer == pEditor->m_Map.m_pTeleLayer)
-				pEditor->m_Map.m_pTeleLayer = nullptr;
-			if(pCurrentLayer == pEditor->m_Map.m_pSpeedupLayer)
-				pEditor->m_Map.m_pSpeedupLayer = nullptr;
-			if(pCurrentLayer == pEditor->m_Map.m_pSwitchLayer)
-				pEditor->m_Map.m_pSwitchLayer = nullptr;
-			if(pCurrentLayer == pEditor->m_Map.m_pTuneLayer)
-				pEditor->m_Map.m_pTuneLayer = nullptr;
-			pEditor->m_Map.m_vpGroups[pEditor->m_SelectedGroup]->DeleteLayer(pEditor->m_vSelectedLayers[0]);
-			return 1;
-		}
-	}
-
-	// duplicate button
-	if(!EntitiesLayer) // entities layers cannot be duplicated
-	{
-		CUIRect DuplicateButton;
-		View.HSplitBottom(4.0f, &View, nullptr);
-		View.HSplitBottom(12.0f, &View, &DuplicateButton);
-		static int s_DuplicationButton = 0;
-		if(pEditor->DoButton_Editor(&s_DuplicationButton, "Duplicate layer", 0, &DuplicateButton, 0, "Duplicates the layer"))
+		if(pEditor->DoButton_Editor(&s_DuplicationButton, "Duplicate layer", 0, &DupButton, 0, "Duplicates the layer"))
 		{
 			pEditor->m_Map.m_vpGroups[pEditor->m_SelectedGroup]->DuplicateLayer(pEditor->m_vSelectedLayers[0]);
 			return 1;
 		}
 	}
 
-	// layer name
-	if(!EntitiesLayer) // name cannot be changed for entities layers
+	// don't allow deletion of game layer
+	if(pEditor->m_Map.m_pGameLayer != pEditor->GetSelectedLayer(0) &&
+		pEditor->DoButton_Editor(&s_DeleteButton, "Delete layer", 0, &Button, 0, "Deletes the layer"))
 	{
-		CUIRect Label, EditBox;
-		View.HSplitBottom(5.0f, &View, nullptr);
-		View.HSplitBottom(12.0f, &View, &Label);
-		Label.VSplitLeft(40.0f, &Label, &EditBox);
-		pEditor->UI()->DoLabel(&Label, "Name:", 10.0f, TEXTALIGN_LEFT);
+		if(pEditor->GetSelectedLayer(0) == pEditor->m_Map.m_pFrontLayer)
+			pEditor->m_Map.m_pFrontLayer = nullptr;
+		if(pEditor->GetSelectedLayer(0) == pEditor->m_Map.m_pTeleLayer)
+			pEditor->m_Map.m_pTeleLayer = nullptr;
+		if(pEditor->GetSelectedLayer(0) == pEditor->m_Map.m_pSpeedupLayer)
+			pEditor->m_Map.m_pSpeedupLayer = nullptr;
+		if(pEditor->GetSelectedLayer(0) == pEditor->m_Map.m_pSwitchLayer)
+			pEditor->m_Map.m_pSwitchLayer = nullptr;
+		if(pEditor->GetSelectedLayer(0) == pEditor->m_Map.m_pTuneLayer)
+			pEditor->m_Map.m_pTuneLayer = nullptr;
+		pEditor->m_Map.m_vpGroups[pEditor->m_SelectedGroup]->DeleteLayer(pEditor->m_vSelectedLayers[0]);
+		return 1;
+	}
+
+	// layer name
+	// if(pEditor->m_Map.m_pGameLayer != pEditor->GetSelectedLayer(0))
+	if(pEditor->m_Map.m_pGameLayer != pEditor->GetSelectedLayer(0) && pEditor->m_Map.m_pTeleLayer != pEditor->GetSelectedLayer(0) && pEditor->m_Map.m_pSpeedupLayer != pEditor->GetSelectedLayer(0) && pEditor->m_Map.m_pFrontLayer != pEditor->GetSelectedLayer(0) && pEditor->m_Map.m_pSwitchLayer != pEditor->GetSelectedLayer(0) && pEditor->m_Map.m_pTuneLayer != pEditor->GetSelectedLayer(0))
+	{
+		View.HSplitBottom(5.0f, &View, &Button);
+		View.HSplitBottom(12.0f, &View, &Button);
+		pEditor->UI()->DoLabel(&Button, "Name:", 10.0f, TEXTALIGN_LEFT);
+		Button.VSplitLeft(40.0f, nullptr, &Button);
 		static float s_Name = 0;
-		if(pEditor->DoEditBox(&s_Name, &EditBox, pCurrentLayer->m_aName, sizeof(pCurrentLayer->m_aName), 10.0f, &s_Name))
+		if(pEditor->DoEditBox(&s_Name, &Button, pEditor->GetSelectedLayer(0)->m_aName, sizeof(pEditor->GetSelectedLayer(0)->m_aName), 10.0f, &s_Name))
 			pEditor->m_Map.m_Modified = true;
 	}
 
-	// spacing if any button was rendered
-	if(!EntitiesLayer || pEditor->m_Map.m_pGameLayer != pCurrentLayer)
-		View.HSplitBottom(10.0f, &View, nullptr);
+	View.HSplitBottom(10.0f, &View, nullptr);
+
+	CLayerGroup *pCurrentGroup = pEditor->m_Map.m_vpGroups[pEditor->m_SelectedGroup];
+	CLayer *pCurrentLayer = pEditor->GetSelectedLayer(0);
 
 	enum
 	{
@@ -478,12 +475,12 @@ int CEditor::PopupLayer(CEditor *pEditor, CUIRect View, void *pContext)
 	CProperty aProps[] = {
 		{"Group", pEditor->m_SelectedGroup, PROPTYPE_INT_STEP, 0, (int)pEditor->m_Map.m_vpGroups.size() - 1},
 		{"Order", pEditor->m_vSelectedLayers[0], PROPTYPE_INT_STEP, 0, (int)pCurrentGroup->m_vpLayers.size() - 1},
-		{"Detail", pCurrentLayer->m_Flags & LAYERFLAG_DETAIL, PROPTYPE_BOOL, 0, 1},
+		{"Detail", pCurrentLayer && pCurrentLayer->m_Flags & LAYERFLAG_DETAIL, PROPTYPE_BOOL, 0, 1},
 		{nullptr},
 	};
 
 	// don't use Group and Detail from the selection if this is an entities layer
-	if(EntitiesLayer)
+	if(pEditor->GetSelectedLayer(0)->IsEntitiesLayer())
 	{
 		aProps[0].m_Type = PROPTYPE_NULL;
 		aProps[2].m_Type = PROPTYPE_NULL;
@@ -497,7 +494,7 @@ int CEditor::PopupLayer(CEditor *pEditor, CUIRect View, void *pContext)
 
 	if(Prop == PROP_ORDER)
 		pEditor->SelectLayer(pCurrentGroup->SwapLayers(pEditor->m_vSelectedLayers[0], NewVal));
-	else if(Prop == PROP_GROUP)
+	else if(Prop == PROP_GROUP && pCurrentLayer)
 	{
 		if(NewVal >= 0 && (size_t)NewVal < pEditor->m_Map.m_vpGroups.size())
 		{
@@ -509,13 +506,15 @@ int CEditor::PopupLayer(CEditor *pEditor, CUIRect View, void *pContext)
 			pEditor->SelectLayer(pEditor->m_Map.m_vpGroups[NewVal]->m_vpLayers.size() - 1);
 		}
 	}
-	else if(Prop == PROP_HQ)
+	else if(Prop == PROP_HQ && pCurrentLayer)
 	{
 		pCurrentLayer->m_Flags &= ~LAYERFLAG_DETAIL;
 		if(NewVal)
 			pCurrentLayer->m_Flags |= LAYERFLAG_DETAIL;
 	}
 
+	if(!pCurrentLayer)
+		return true;
 	return pCurrentLayer->RenderProperties(&View);
 }
 
