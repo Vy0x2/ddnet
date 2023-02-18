@@ -700,11 +700,15 @@ void CGameContext::ConModerate(IConsole::IResult *pResult, void *pUserData)
 	CPlayer *pPlayer = pSelf->m_apPlayers[pResult->m_ClientID];
 	pPlayer->m_Moderating = !pPlayer->m_Moderating;
 
+	char aBuf[256];
+
 	if(!HadModerator && pPlayer->m_Moderating)
-		pSelf->SendChat(-1, CHAT_ALL, "Server kick/spec votes will now be actively moderated.", 0);
+		str_format(aBuf, sizeof(aBuf), "Server kick/spec votes will now be actively moderated.");
 
 	if(!pSelf->PlayerModerating())
-		pSelf->SendChat(-1, CHAT_ALL, "Server kick/spec votes are no longer actively moderated.", 0);
+		str_format(aBuf, sizeof(aBuf), "Server kick/spec votes are no longer actively moderated.");
+
+	pSelf->SendChat(-1, CHAT_ALL, aBuf, 0);
 
 	if(pPlayer->m_Moderating)
 		pSelf->SendChatTarget(pResult->m_ClientID, "Active moderator mode enabled for you.");
