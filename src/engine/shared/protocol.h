@@ -3,7 +3,7 @@
 #ifndef ENGINE_SHARED_PROTOCOL_H
 #define ENGINE_SHARED_PROTOCOL_H
 
-#include <bitset>
+#include <base/tl/bitmask.h>
 
 /*
 	Connection diagram - How the initialization works.
