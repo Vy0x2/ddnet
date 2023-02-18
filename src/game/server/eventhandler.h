@@ -5,7 +5,7 @@
 
 #include <stdint.h>
 
-#include <engine/shared/protocol.h>
+#include <base/tl/bitmask.h>
 
 class CEventHandler
 {
