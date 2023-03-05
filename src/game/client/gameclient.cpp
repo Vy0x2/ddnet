@@ -3597,17 +3597,18 @@ float CGameClient::ZoomStuff(vec2 minpos, vec2 maxpos)
 	float maxZoom;
 	float minZoom;
 
+	//dbg_msg("dbg", "xdist: %f, ydist: %f", maxpos.x - minpos.x, maxpos.y - minpos.y);
+
 	// X distance
-	maxPlayerDistance = 2200.0f;
-	minPlayerDistance = 600.0f;
-	maxZoom = 1.3f * (powf(ratio, 1.8));
-	minZoom = 6.4f * (powf(ratio, 0.36));
+	maxPlayerDistance = 2500.0f;
+	minPlayerDistance = -5500.0f;
+	maxZoom = 1.0f * (powf(ratio, 2.6));
+	minZoom = 17.5f;
 
 	float zoomX = MapValue(maxPlayerDistance, minPlayerDistance, maxZoom, minZoom, maxpos.x - minpos.x);
 
 	// Y distance
-	maxZoom = 1.3f;
-	minZoom = 6.4;
+	maxZoom = 1.0f;
 
 	float zoomY = MapValue(maxPlayerDistance, minPlayerDistance, maxZoom, minZoom, maxpos.y - minpos.y);
 
