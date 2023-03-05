@@ -305,7 +305,7 @@ void CSpectator::OnRender()
 		m_MultiViewSelected = true;
 	}
 	TextRender()->TextColor(1.0f, 1.0f, 1.0f, m_MultiViewSelected ? 1.0f : 0.5f);
-	TextRender()->Text(0, Width / 2.0f + (40.0f), Height / 2.0f - 280.f + (60.f - BigFontSize) / 2.f, BigFontSize, Localize("Multi-View"), -1.0f);
+	TextRender()->Text(Width / 2.0f + (40.0f), Height / 2.0f - 280.f + (60.f - BigFontSize) / 2.f, BigFontSize, Localize("Multi-View"), -1.0f);
 
 	if(Client()->State() == IClient::STATE_DEMOPLAYBACK && m_pClient->m_Snap.m_LocalClientID >= 0)
 	{

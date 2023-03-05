@@ -1437,7 +1437,7 @@ void CHud::RenderMovementInformation(const int ClientID)
 				str_format(aBuf2, sizeof(aBuf2), "⊡");
 		}
 
-		TextRender()->Text(0, xr - 5, y, Fontsize, aBuf2, -1.0f);
+		TextRender()->Text(xr - 5, y, Fontsize, aBuf2, -1.0f);
 		// addition end
 		y += MOVEMENT_INFORMATION_LINE_HEIGHT;
 
