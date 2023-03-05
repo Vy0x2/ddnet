@@ -28,6 +28,7 @@
 #include <engine/shared/network.h>
 #include <engine/shared/packer.h>
 #include <engine/shared/protocol.h>
+#include <engine/shared/protocol7.h>
 #include <engine/shared/protocol_ex.h>
 #include <engine/shared/rust_version.h>
 #include <engine/shared/snapshot.h>
@@ -703,7 +704,8 @@ int CServer::DistinctClientCount() const
 	int ClientCount = 0;
 	for(int i = 0; i < MAX_CLIENTS; i++)
 	{
-		if(m_aClients[i].m_State != CClient::STATE_EMPTY)
+		// connecting clients with spoofed ips can clog slots without being ingame
+		if(ClientIngame(i))
 		{
 			ClientCount++;
 			for(int j = 0; j < i; j++)
@@ -748,7 +750,7 @@ static inline bool RepackMsg(const CMsgPacker *pMsg, CPacker &Packer, bool Sixup
 			else if(MsgId >= NETMSG_CON_READY && MsgId <= NETMSG_INPUTTIMING)
 				MsgId += 1;
 			else if(MsgId == NETMSG_RCON_LINE)
-				MsgId = 13;
+				MsgId = protocol7::NETMSG_RCON_LINE;
 			else if(MsgId >= NETMSG_AUTH_CHALLENGE && MsgId <= NETMSG_AUTH_RESULT)
 				MsgId += 4;
 			else if(MsgId >= NETMSG_PING && MsgId <= NETMSG_ERROR)
@@ -1686,7 +1688,7 @@ void CServer::ProcessClientPacket(CNetChunk *pPacket)
 						}
 						else
 						{
-							CMsgPacker Msgp(11, true, true); //NETMSG_RCON_AUTH_ON
+							CMsgPacker Msgp(protocol7::NETMSG_RCON_AUTH_ON, true, true);
 							SendMsg(&Msgp, MSGFLAG_VITAL, ClientID);
 						}
 
@@ -1749,7 +1751,7 @@ void CServer::ProcessClientPacket(CNetChunk *pPacket)
 		else if(Msg == NETMSG_PING)
 		{
 			CMsgPacker Msgp(NETMSG_PING_REPLY, true);
-			SendMsg(&Msgp, 0, ClientID);
+			SendMsg(&Msgp, MSGFLAG_FLUSH, ClientID);
 		}
 		else if(Msg == NETMSG_PINGEX)
 		{
@@ -2597,9 +2599,7 @@ int CServer::Run()
 
 	m_Econ.Init(Config(), Console(), &m_ServerBan);
 
-#if defined(CONF_FAMILY_UNIX)
 	m_Fifo.Init(Console(), Config()->m_SvInputFifo, CFGFLAG_SERVER);
-#endif
 
 	char aBuf[256];
 	str_format(aBuf, sizeof(aBuf), "server name is '%s'", Config()->m_SvName);
@@ -2797,9 +2797,7 @@ int CServer::Run()
 
 				UpdateClientRconCommands();
 
-#if defined(CONF_FAMILY_UNIX)
 				m_Fifo.Update();
-#endif
 			}
 
 			// master server stuff
@@ -2878,9 +2876,7 @@ int CServer::Run()
 
 	m_Econ.Shutdown();
 
-#if defined(CONF_FAMILY_UNIX)
 	m_Fifo.Shutdown();
-#endif
 
 	GameServer()->OnShutdown();
 	m_pMap->Unload();
@@ -3515,7 +3511,7 @@ void CServer::LogoutClient(int ClientID, const char *pReason)
 	}
 	else
 	{
-		CMsgPacker Msg(12, true, true); //NETMSG_RCON_AUTH_OFF
+		CMsgPacker Msg(protocol7::NETMSG_RCON_AUTH_OFF, true, true);
 		SendMsg(&Msg, MSGFLAG_VITAL, ClientID);
 	}
 

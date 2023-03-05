@@ -16,7 +16,7 @@ CDoor::CDoor(CGameWorld *pGameWorld, vec2 Pos, float Rotation, int Length,
 	m_Number = Number;
 	m_Pos = Pos;
 	m_Length = Length;
-	m_Direction = vec2(sin(Rotation), cos(Rotation));
+	m_Direction = vec2(std::sin(Rotation), std::cos(Rotation));
 	vec2 To = Pos + normalize(m_Direction) * m_Length;
 
 	GameServer()->Collision()->IntersectNoLaser(Pos, To, &this->m_To, 0);
@@ -54,7 +54,7 @@ void CDoor::Snap(int SnappingClient)
 
 	CNetObj_EntityEx *pEntData = 0;
 	if(SnappingClientVersion >= VERSION_DDNET_SWITCH)
-		pEntData = static_cast<CNetObj_EntityEx *>(Server()->SnapNewItem(NETOBJTYPE_ENTITYEX, GetID(), sizeof(CNetObj_EntityEx)));
+		pEntData = Server()->SnapNewItem<CNetObj_EntityEx>(GetID());
 
 	vec2 From;
 	int StartTick;
@@ -86,30 +86,6 @@ void CDoor::Snap(int SnappingClient)
 		StartTick = Server()->Tick();
 	}
 
-	if(SnappingClientVersion >= VERSION_DDNET_MULTI_LASER)
-	{
-		CNetObj_DDNetLaser *pObj = static_cast<CNetObj_DDNetLaser *>(Server()->SnapNewItem(NETOBJTYPE_DDNETLASER, GetID(), sizeof(CNetObj_DDNetLaser)));
-		if(!pObj)
-			return;
-
-		pObj->m_ToX = (int)m_Pos.x;
-		pObj->m_ToY = (int)m_Pos.y;
-		pObj->m_FromX = (int)From.x;
-		pObj->m_FromY = (int)From.y;
-		pObj->m_StartTick = StartTick;
-		pObj->m_Owner = -1;
-		pObj->m_Type = LASERTYPE_DOOR;
-	}
-	else
-	{
-		CNetObj_Laser *pObj = static_cast<CNetObj_Laser *>(Server()->SnapNewItem(NETOBJTYPE_LASER, GetID(), sizeof(CNetObj_Laser)));
-		if(!pObj)
-			return;
-
-		pObj->m_X = (int)m_Pos.x;
-		pObj->m_Y = (int)m_Pos.y;
-		pObj->m_FromX = (int)From.x;
-		pObj->m_FromY = (int)From.y;
-		pObj->m_StartTick = StartTick;
-	}
+	GameServer()->SnapLaserObject(CSnapContext(SnappingClientVersion), GetID(),
+		m_Pos, From, StartTick, -1, LASERTYPE_DOOR);
 }

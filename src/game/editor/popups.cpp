@@ -86,7 +86,7 @@ void CEditor::UiDoPopupMenu()
 		r.Draw(ColorRGBA(0, 0, 0, 0.75f), Corners, 3.0f);
 		r.Margin(4.0f, &r);
 
-		if(s_UiPopups[i].m_pfnFunc(this, r, s_UiPopups[i].m_pContext) || Input()->KeyPress(KEY_ESCAPE))
+		if(s_UiPopups[i].m_pfnFunc(this, r, s_UiPopups[i].m_pContext) || UI()->ConsumeHotkey(CUI::HOTKEY_ESCAPE))
 			UiClosePopupMenus(1);
 	}
 }
@@ -403,66 +403,69 @@ int CEditor::PopupLayer(CEditor *pEditor, CUIRect View, void *pContext)
 {
 	CLayerPopupContext *pPopup = (CLayerPopupContext *)pContext;
 
-	// remove layer button
-	CUIRect Button;
-	View.HSplitBottom(12.0f, &View, &Button);
-	static int s_DeleteButton = 0;
+	CLayerGroup *pCurrentGroup = pEditor->m_Map.m_vpGroups[pEditor->m_SelectedGroup];
+	CLayer *pCurrentLayer = pEditor->GetSelectedLayer(0);
 
 	if(pPopup->m_vpLayers.size() > 1)
 	{
 		return CLayerTiles::RenderCommonProperties(pPopup->m_CommonPropState, pEditor, &View, pPopup->m_vpLayers);
 	}
 
-	// duplicate layer button
-	CUIRect DupButton;
-	static int s_DuplicationButton = 0;
-	View.HSplitBottom(4.0f, &View, nullptr);
-	View.HSplitBottom(12.0f, &View, &DupButton);
+	const bool EntitiesLayer = pCurrentLayer->IsEntitiesLayer();
 
-	if(!pEditor->IsSpecialLayer(pEditor->GetSelectedLayer(0)))
+	// delete button
+	if(pEditor->m_Map.m_pGameLayer != pCurrentLayer) // entities layers except the game layer can be deleted
 	{
-		if(pEditor->DoButton_Editor(&s_DuplicationButton, "Duplicate layer", 0, &DupButton, 0, "Duplicates the layer"))
+		CUIRect DeleteButton;
+		View.HSplitBottom(12.0f, &View, &DeleteButton);
+		static int s_DeleteButton = 0;
+		if(pEditor->DoButton_Editor(&s_DeleteButton, "Delete layer", 0, &DeleteButton, 0, "Deletes the layer"))
+		{
+			if(pCurrentLayer == pEditor->m_Map.m_pFrontLayer)
+				pEditor->m_Map.m_pFrontLayer = nullptr;
+			if(pCurrentLayer == pEditor->m_Map.m_pTeleLayer)
+				pEditor->m_Map.m_pTeleLayer = nullptr;
+			if(pCurrentLayer == pEditor->m_Map.m_pSpeedupLayer)
+				pEditor->m_Map.m_pSpeedupLayer = nullptr;
+			if(pCurrentLayer == pEditor->m_Map.m_pSwitchLayer)
+				pEditor->m_Map.m_pSwitchLayer = nullptr;
+			if(pCurrentLayer == pEditor->m_Map.m_pTuneLayer)
+				pEditor->m_Map.m_pTuneLayer = nullptr;
+			pEditor->m_Map.m_vpGroups[pEditor->m_SelectedGroup]->DeleteLayer(pEditor->m_vSelectedLayers[0]);
+			return 1;
+		}
+	}
+
+	// duplicate button
+	if(!EntitiesLayer) // entities layers cannot be duplicated
+	{
+		CUIRect DuplicateButton;
+		View.HSplitBottom(4.0f, &View, nullptr);
+		View.HSplitBottom(12.0f, &View, &DuplicateButton);
+		static int s_DuplicationButton = 0;
+		if(pEditor->DoButton_Editor(&s_DuplicationButton, "Duplicate layer", 0, &DuplicateButton, 0, "Duplicates the layer"))
 		{
 			pEditor->m_Map.m_vpGroups[pEditor->m_SelectedGroup]->DuplicateLayer(pEditor->m_vSelectedLayers[0]);
 			return 1;
 		}
 	}
 
-	// don't allow deletion of game layer
-	if(pEditor->m_Map.m_pGameLayer != pEditor->GetSelectedLayer(0) &&
-		pEditor->DoButton_Editor(&s_DeleteButton, "Delete layer", 0, &Button, 0, "Deletes the layer"))
-	{
-		if(pEditor->GetSelectedLayer(0) == pEditor->m_Map.m_pFrontLayer)
-			pEditor->m_Map.m_pFrontLayer = nullptr;
-		if(pEditor->GetSelectedLayer(0) == pEditor->m_Map.m_pTeleLayer)
-			pEditor->m_Map.m_pTeleLayer = nullptr;
-		if(pEditor->GetSelectedLayer(0) == pEditor->m_Map.m_pSpeedupLayer)
-			pEditor->m_Map.m_pSpeedupLayer = nullptr;
-		if(pEditor->GetSelectedLayer(0) == pEditor->m_Map.m_pSwitchLayer)
-			pEditor->m_Map.m_pSwitchLayer = nullptr;
-		if(pEditor->GetSelectedLayer(0) == pEditor->m_Map.m_pTuneLayer)
-			pEditor->m_Map.m_pTuneLayer = nullptr;
-		pEditor->m_Map.m_vpGroups[pEditor->m_SelectedGroup]->DeleteLayer(pEditor->m_vSelectedLayers[0]);
-		return 1;
-	}
-
 	// layer name
-	// if(pEditor->m_Map.m_pGameLayer != pEditor->GetSelectedLayer(0))
-	if(pEditor->m_Map.m_pGameLayer != pEditor->GetSelectedLayer(0) && pEditor->m_Map.m_pTeleLayer != pEditor->GetSelectedLayer(0) && pEditor->m_Map.m_pSpeedupLayer != pEditor->GetSelectedLayer(0) && pEditor->m_Map.m_pFrontLayer != pEditor->GetSelectedLayer(0) && pEditor->m_Map.m_pSwitchLayer != pEditor->GetSelectedLayer(0) && pEditor->m_Map.m_pTuneLayer != pEditor->GetSelectedLayer(0))
+	if(!EntitiesLayer) // name cannot be changed for entities layers
 	{
-		View.HSplitBottom(5.0f, &View, &Button);
-		View.HSplitBottom(12.0f, &View, &Button);
-		pEditor->UI()->DoLabel(&Button, "Name:", 10.0f, TEXTALIGN_LEFT);
-		Button.VSplitLeft(40.0f, nullptr, &Button);
+		CUIRect Label, EditBox;
+		View.HSplitBottom(5.0f, &View, nullptr);
+		View.HSplitBottom(12.0f, &View, &Label);
+		Label.VSplitLeft(40.0f, &Label, &EditBox);
+		pEditor->UI()->DoLabel(&Label, "Name:", 10.0f, TEXTALIGN_LEFT);
 		static float s_Name = 0;
-		if(pEditor->DoEditBox(&s_Name, &Button, pEditor->GetSelectedLayer(0)->m_aName, sizeof(pEditor->GetSelectedLayer(0)->m_aName), 10.0f, &s_Name))
+		if(pEditor->DoEditBox(&s_Name, &EditBox, pCurrentLayer->m_aName, sizeof(pCurrentLayer->m_aName), 10.0f, &s_Name))
 			pEditor->m_Map.m_Modified = true;
 	}
 
-	View.HSplitBottom(10.0f, &View, nullptr);
-
-	CLayerGroup *pCurrentGroup = pEditor->m_Map.m_vpGroups[pEditor->m_SelectedGroup];
-	CLayer *pCurrentLayer = pEditor->GetSelectedLayer(0);
+	// spacing if any button was rendered
+	if(!EntitiesLayer || pEditor->m_Map.m_pGameLayer != pCurrentLayer)
+		View.HSplitBottom(10.0f, &View, nullptr);
 
 	enum
 	{
@@ -475,12 +478,12 @@ int CEditor::PopupLayer(CEditor *pEditor, CUIRect View, void *pContext)
 	CProperty aProps[] = {
 		{"Group", pEditor->m_SelectedGroup, PROPTYPE_INT_STEP, 0, (int)pEditor->m_Map.m_vpGroups.size() - 1},
 		{"Order", pEditor->m_vSelectedLayers[0], PROPTYPE_INT_STEP, 0, (int)pCurrentGroup->m_vpLayers.size() - 1},
-		{"Detail", pCurrentLayer && pCurrentLayer->m_Flags & LAYERFLAG_DETAIL, PROPTYPE_BOOL, 0, 1},
+		{"Detail", pCurrentLayer->m_Flags & LAYERFLAG_DETAIL, PROPTYPE_BOOL, 0, 1},
 		{nullptr},
 	};
 
-	// if(pEditor->m_Map.m_pGameLayer == pEditor->GetSelectedLayer(0)) // don't use Group and Detail from the selection if this is the game layer
-	if(pEditor->m_Map.m_pGameLayer == pEditor->GetSelectedLayer(0) || pEditor->m_Map.m_pTeleLayer == pEditor->GetSelectedLayer(0) || pEditor->m_Map.m_pSpeedupLayer == pEditor->GetSelectedLayer(0) || pEditor->m_Map.m_pFrontLayer == pEditor->GetSelectedLayer(0) || pEditor->m_Map.m_pSwitchLayer == pEditor->GetSelectedLayer(0) || pEditor->m_Map.m_pTuneLayer == pEditor->GetSelectedLayer(0)) // don't use Group and Detail from the selection if this is the game layer
+	// don't use Group and Detail from the selection if this is an entities layer
+	if(EntitiesLayer)
 	{
 		aProps[0].m_Type = PROPTYPE_NULL;
 		aProps[2].m_Type = PROPTYPE_NULL;
@@ -494,7 +497,7 @@ int CEditor::PopupLayer(CEditor *pEditor, CUIRect View, void *pContext)
 
 	if(Prop == PROP_ORDER)
 		pEditor->SelectLayer(pCurrentGroup->SwapLayers(pEditor->m_vSelectedLayers[0], NewVal));
-	else if(Prop == PROP_GROUP && pCurrentLayer && pCurrentLayer->m_Type != LAYERTYPE_GAME)
+	else if(Prop == PROP_GROUP)
 	{
 		if(NewVal >= 0 && (size_t)NewVal < pEditor->m_Map.m_vpGroups.size())
 		{
@@ -506,15 +509,13 @@ int CEditor::PopupLayer(CEditor *pEditor, CUIRect View, void *pContext)
 			pEditor->SelectLayer(pEditor->m_Map.m_vpGroups[NewVal]->m_vpLayers.size() - 1);
 		}
 	}
-	else if(Prop == PROP_HQ && pCurrentLayer)
+	else if(Prop == PROP_HQ)
 	{
 		pCurrentLayer->m_Flags &= ~LAYERFLAG_DETAIL;
 		if(NewVal)
 			pCurrentLayer->m_Flags |= LAYERFLAG_DETAIL;
 	}
 
-	if(!pCurrentLayer)
-		return true;
 	return pCurrentLayer->RenderProperties(&View);
 }
 
@@ -1906,8 +1907,8 @@ void CEditor::SConfirmPopupContext::Reset()
 
 void CEditor::ShowPopupConfirm(float X, float Y, SConfirmPopupContext *pContext)
 {
-	const float TextWidth = minimum(TextRender()->TextWidth(nullptr, SConfirmPopupContext::POPUP_FONT_SIZE, pContext->m_aMessage, -1, -1.0f), SConfirmPopupContext::POPUP_MAX_WIDTH);
-	const int LineCount = TextRender()->TextLineCount(nullptr, SConfirmPopupContext::POPUP_FONT_SIZE, pContext->m_aMessage, TextWidth);
+	const float TextWidth = minimum(TextRender()->TextWidth(SConfirmPopupContext::POPUP_FONT_SIZE, pContext->m_aMessage, -1, -1.0f), SConfirmPopupContext::POPUP_MAX_WIDTH);
+	const int LineCount = TextRender()->TextLineCount(SConfirmPopupContext::POPUP_FONT_SIZE, pContext->m_aMessage, TextWidth);
 	const float PopupHeight = LineCount * SConfirmPopupContext::POPUP_FONT_SIZE + SConfirmPopupContext::POPUP_BUTTON_HEIGHT + SConfirmPopupContext::POPUP_BUTTON_SPACING + 10.0f;
 	pContext->m_Result = SConfirmPopupContext::UNSET;
 	UiInvokePopupMenu(pContext, 0, X, Y, TextWidth + 10.0f, PopupHeight, PopupConfirm, pContext);
@@ -1945,8 +1946,8 @@ int CEditor::PopupConfirm(CEditor *pEditor, CUIRect View, void *pContext)
 
 void CEditor::ShowPopupMessage(float X, float Y, SMessagePopupContext *pContext)
 {
-	const float TextWidth = minimum(TextRender()->TextWidth(nullptr, SMessagePopupContext::POPUP_FONT_SIZE, pContext->m_aMessage, -1, -1.0f), SMessagePopupContext::POPUP_MAX_WIDTH);
-	const int LineCount = TextRender()->TextLineCount(nullptr, SMessagePopupContext::POPUP_FONT_SIZE, pContext->m_aMessage, TextWidth);
+	const float TextWidth = minimum(TextRender()->TextWidth(SMessagePopupContext::POPUP_FONT_SIZE, pContext->m_aMessage, -1, -1.0f), SMessagePopupContext::POPUP_MAX_WIDTH);
+	const int LineCount = TextRender()->TextLineCount(SMessagePopupContext::POPUP_FONT_SIZE, pContext->m_aMessage, TextWidth);
 	UiInvokePopupMenu(pContext, 0, X, Y, TextWidth + 10.0f, LineCount * SMessagePopupContext::POPUP_FONT_SIZE + 10.0f, PopupMessage, pContext);
 }
 
@@ -1966,7 +1967,7 @@ int CEditor::PopupSelection(CEditor *pEditor, CUIRect View, void *pContext)
 	SSelectionPopupContext *pSelectionPopup = static_cast<SSelectionPopupContext *>(pContext);
 
 	CUIRect Slot;
-	const int LineCount = pEditor->TextRender()->TextLineCount(nullptr, SSelectionPopupContext::POPUP_FONT_SIZE, pSelectionPopup->m_aMessage, SSelectionPopupContext::POPUP_MAX_WIDTH);
+	const int LineCount = pEditor->TextRender()->TextLineCount(SSelectionPopupContext::POPUP_FONT_SIZE, pSelectionPopup->m_aMessage, SSelectionPopupContext::POPUP_MAX_WIDTH);
 	View.HSplitTop(LineCount * SSelectionPopupContext::POPUP_FONT_SIZE, &Slot, &View);
 
 	CTextCursor Cursor;
@@ -1987,7 +1988,7 @@ int CEditor::PopupSelection(CEditor *pEditor, CUIRect View, void *pContext)
 
 void CEditor::ShowPopupSelection(float X, float Y, SSelectionPopupContext *pContext)
 {
-	const int LineCount = TextRender()->TextLineCount(nullptr, SSelectionPopupContext::POPUP_FONT_SIZE, pContext->m_aMessage, SSelectionPopupContext::POPUP_MAX_WIDTH);
+	const int LineCount = TextRender()->TextLineCount(SSelectionPopupContext::POPUP_FONT_SIZE, pContext->m_aMessage, SSelectionPopupContext::POPUP_MAX_WIDTH);
 	const float PopupHeight = LineCount * SSelectionPopupContext::POPUP_FONT_SIZE + pContext->m_Entries.size() * (SSelectionPopupContext::POPUP_ENTRY_HEIGHT + SSelectionPopupContext::POPUP_ENTRY_SPACING) + 10.0f;
 	pContext->m_pSelection = nullptr;
 	UiInvokePopupMenu(pContext, 0, X, Y, SSelectionPopupContext::POPUP_MAX_WIDTH + 10.0f, PopupHeight, PopupSelection, pContext);

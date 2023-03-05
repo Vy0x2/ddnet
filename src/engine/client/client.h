@@ -281,9 +281,7 @@ class CClient : public IClient, public CDemoPlayer::IListener
 
 	std::vector<SWarning> m_vWarnings;
 
-#if defined(CONF_FAMILY_UNIX)
 	CFifo m_Fifo;
-#endif
 
 	IOHANDLE m_BenchmarkFile;
 	int64_t m_BenchmarkStopTime;
@@ -441,7 +439,6 @@ public:
 	static void Con_Minimize(IConsole::IResult *pResult, void *pUserData);
 	static void Con_Ping(IConsole::IResult *pResult, void *pUserData);
 	static void Con_Screenshot(IConsole::IResult *pResult, void *pUserData);
-	static void Con_Reset(IConsole::IResult *pResult, void *pUserData);
 
 #if defined(CONF_VIDEORECORDER)
 	static void StartVideo(IConsole::IResult *pResult, void *pUserData, const char *pVideoName);

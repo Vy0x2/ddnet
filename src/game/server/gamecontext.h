@@ -7,12 +7,12 @@
 #include <engine/server.h>
 
 #include <game/collision.h>
+#include <game/generated/protocol.h>
 #include <game/layers.h>
 #include <game/mapbugs.h>
 #include <game/voting.h>
 
 #include "eventhandler.h"
-#include "game/generated/protocol.h"
 #include "gameworld.h"
 #include "teehistorian.h"
 
@@ -58,6 +58,21 @@ class IEngine;
 class IStorage;
 struct CAntibotRoundData;
 struct CScoreRandomMapResult;
+
+struct CSnapContext
+{
+	CSnapContext(int Version, bool Sixup = false) :
+		m_ClientVersion(Version), m_Sixup(Sixup)
+	{
+	}
+
+	int GetClientVersion() const { return m_ClientVersion; }
+	bool IsSixup() const { return m_Sixup; }
+
+private:
+	int m_ClientVersion;
+	bool m_Sixup;
+};
 
 class CGameContext : public IGameServer
 {
@@ -205,13 +220,16 @@ public:
 	CVoteOptionServer *m_pVoteOptionLast;
 
 	// helper functions
-	void CreateDamageInd(vec2 Pos, float AngleMod, int Amount, int64_t Mask = -1);
-	void CreateExplosion(vec2 Pos, int Owner, int Weapon, bool NoDamage, int ActivatedTeam, int64_t Mask);
-	void CreateHammerHit(vec2 Pos, int64_t Mask = -1);
-	void CreatePlayerSpawn(vec2 Pos, int64_t Mask = -1);
-	void CreateDeath(vec2 Pos, int ClientID, int64_t Mask = -1);
-	void CreateSound(vec2 Pos, int Sound, int64_t Mask = -1);
+	void CreateDamageInd(vec2 Pos, float AngleMod, int Amount, CClientMask Mask = CClientMask().set());
+	void CreateExplosion(vec2 Pos, int Owner, int Weapon, bool NoDamage, int ActivatedTeam, CClientMask Mask = CClientMask().set());
+	void CreateHammerHit(vec2 Pos, CClientMask Mask = CClientMask().set());
+	void CreatePlayerSpawn(vec2 Pos, CClientMask Mask = CClientMask().set());
+	void CreateDeath(vec2 Pos, int ClientID, CClientMask Mask = CClientMask().set());
+	void CreateSound(vec2 Pos, int Sound, CClientMask Mask = CClientMask().set());
 	void CreateSoundGlobal(int Sound, int Target = -1);
+
+	bool SnapLaserObject(const CSnapContext &Context, int SnapID, const vec2 &To, const vec2 &From, int StartTick, int Owner = -1, int LaserType = -1);
+	bool SnapPickup(const CSnapContext &Context, int SnapID, const vec2 &Pos, int Type, int SubType);
 
 	enum
 	{
@@ -296,7 +314,7 @@ public:
 	int64_t m_NonEmptySince;
 	int64_t m_LastMapVote;
 	int GetClientVersion(int ClientID) const;
-	int64_t ClientsMaskExcludeClientVersionAndHigher(int Version);
+	CClientMask ClientsMaskExcludeClientVersionAndHigher(int Version);
 	bool PlayerExists(int ClientID) const override { return m_apPlayers[ClientID]; }
 	// Returns true if someone is actively moderating.
 	bool PlayerModerating() const;
@@ -316,7 +334,7 @@ private:
 	bool m_VoteWillPass;
 	CScore *m_pScore;
 
-	//DDRace Console Commands
+	// DDRace Console Commands
 
 	static void ConKillPlayer(IConsole::IResult *pResult, void *pUserData);
 
@@ -496,16 +514,8 @@ public:
 
 	void SendRecord(int ClientID);
 	void OnSetAuthed(int ClientID, int Level) override;
-	virtual bool PlayerCollision();
-	virtual bool PlayerHooking();
-	virtual float PlayerJetpack();
 
 	void ResetTuning();
 };
 
-inline int64_t CmaskAll() { return -1LL; }
-inline int64_t CmaskOne(int ClientID) { return 1LL << ClientID; }
-inline int64_t CmaskUnset(int64_t Mask, int ClientID) { return Mask ^ CmaskOne(ClientID); }
-inline int64_t CmaskAllExceptOne(int ClientID) { return CmaskUnset(CmaskAll(), ClientID); }
-inline bool CmaskIsSet(int64_t Mask, int ClientID) { return (Mask & CmaskOne(ClientID)) != 0; }
 #endif

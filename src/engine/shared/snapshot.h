@@ -4,7 +4,7 @@
 #define ENGINE_SHARED_SNAPSHOT_H
 
 #include <cstddef>
-#include <stdint.h>
+#include <cstdint>
 
 // CSnapshot
 
@@ -88,7 +88,7 @@ private:
 	int m_aSnapshotDataUpdates[CSnapshot::MAX_TYPE + 1];
 	CData m_Empty;
 
-	static bool UndiffItem(const int *pPast, int *pDiff, int *pOut, int Size, int *pDataRate);
+	static void UndiffItem(const int *pPast, int *pDiff, int *pOut, int Size, int *pDataRate);
 
 public:
 	static int DiffItem(const int *pPast, const int *pCurrent, int *pOut, int Size);
