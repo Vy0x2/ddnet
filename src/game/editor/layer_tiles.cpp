@@ -18,6 +18,7 @@ CLayerTiles::CLayerTiles(int w, int h)
 	m_aName[0] = '\0';
 	m_Width = w;
 	m_Height = h;
+	m_Texture.Invalidate();
 	m_Image = -1;
 	m_Game = 0;
 	m_Color.r = 255;
@@ -177,6 +178,11 @@ void CLayerTiles::Clamp(RECTi *pRect)
 		pRect->w = 0;
 }
 
+bool CLayerTiles::IsEntitiesLayer() const
+{
+	return m_pEditor->m_Map.m_pGameLayer == this || m_pEditor->m_Map.m_pTeleLayer == this || m_pEditor->m_Map.m_pSpeedupLayer == this || m_pEditor->m_Map.m_pFrontLayer == this || m_pEditor->m_Map.m_pSwitchLayer == this || m_pEditor->m_Map.m_pTuneLayer == this;
+}
+
 bool CLayerTiles::IsEmpty(CLayerTiles *pLayer)
 {
 	for(int y = 0; y < pLayer->m_Height; y++)
@@ -214,7 +220,7 @@ void CLayerTiles::BrushSelecting(CUIRect Rect)
 	m_pEditor->Graphics()->QuadsEnd();
 	char aBuf[16];
 	str_format(aBuf, sizeof(aBuf), "%d,%d", ConvertX(Rect.w), ConvertY(Rect.h));
-	TextRender()->Text(nullptr, Rect.x + 3.0f, Rect.y + 3.0f, m_pEditor->m_ShowPicker ? 15.0f : 15.0f * m_pEditor->m_WorldZoom, aBuf, -1.0f);
+	TextRender()->Text(Rect.x + 3.0f, Rect.y + 3.0f, m_pEditor->m_ShowPicker ? 15.0f : 15.0f * m_pEditor->m_WorldZoom, aBuf, -1.0f);
 }
 
 int CLayerTiles::BrushGrab(CLayerGroup *pBrush, CUIRect Rect)
@@ -683,12 +689,12 @@ int CLayerTiles::RenderProperties(CUIRect *pToolBox)
 {
 	CUIRect Button;
 
-	bool IsGameLayer = (m_pEditor->m_Map.m_pGameLayer == this || m_pEditor->m_Map.m_pTeleLayer == this || m_pEditor->m_Map.m_pSpeedupLayer == this || m_pEditor->m_Map.m_pFrontLayer == this || m_pEditor->m_Map.m_pSwitchLayer == this || m_pEditor->m_Map.m_pTuneLayer == this);
+	const bool EntitiesLayer = IsEntitiesLayer();
 
 	CLayerGroup *pGroup = m_pEditor->m_Map.m_vpGroups[m_pEditor->m_SelectedGroup];
 
 	// Game tiles can only be constructed if the layer is relative to the game layer
-	if(!IsGameLayer && !(pGroup->m_OffsetX % 32) && !(pGroup->m_OffsetY % 32) && pGroup->m_ParallaxX == 100 && pGroup->m_ParallaxY == 100)
+	if(!EntitiesLayer && !(pGroup->m_OffsetX % 32) && !(pGroup->m_OffsetY % 32) && pGroup->m_ParallaxX == 100 && pGroup->m_ParallaxY == 100)
 	{
 		pToolBox->HSplitBottom(12.0f, pToolBox, &Button);
 		static int s_ColclButton = 0;
@@ -847,7 +853,7 @@ int CLayerTiles::RenderProperties(CUIRect *pToolBox)
 		{nullptr},
 	};
 
-	if(IsGameLayer) // remove the image and color properties if this is a game layer
+	if(EntitiesLayer) // remove the image and color properties if this is a game layer
 	{
 		aProps[PROP_IMAGE].m_pName = nullptr;
 		aProps[PROP_COLOR].m_pName = nullptr;
@@ -905,7 +911,7 @@ int CLayerTiles::RenderProperties(CUIRect *pToolBox)
 				m_pEditor->m_PopupEventType = m_pEditor->POPEVENT_IMAGEDIV16;
 				m_pEditor->m_PopupEventActivated = true;
 
-				m_Texture = IGraphics::CTextureHandle();
+				m_Texture.Invalidate();
 				m_Image = -1;
 			}
 		}
@@ -1306,6 +1312,10 @@ bool CLayerTele::ContainsElementWithId(int Id)
 	{
 		for(int x = 0; x < m_Width; ++x)
 		{
+			if(m_pTeleTile[y * m_Width + x].m_Type == TILE_TELECHECKIN)
+				continue;
+			if(m_pTeleTile[y * m_Width + x].m_Type == TILE_TELECHECKINEVIL)
+				continue;
 			if(m_pTeleTile[y * m_Width + x].m_Number == Id)
 			{
 				return true;

@@ -26,6 +26,7 @@
 
 #if defined(CONF_FAMILY_UNIX)
 #include <csignal>
+#include <locale>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/utsname.h>
@@ -51,8 +52,13 @@
 #define _task_user_
 
 #include <Carbon/Carbon.h>
+#include <CoreFoundation/CoreFoundation.h>
 #include <mach-o/dyld.h>
 #include <mach/mach_time.h>
+
+#if defined(__MAC_10_10) && __MAC_OS_X_VERSION_MIN_REQUIRED >= __MAC_10_10
+#include <pthread/qos.h>
+#endif
 #endif
 
 #elif defined(CONF_FAMILY_WINDOWS)
@@ -66,7 +72,7 @@
 #include <ws2tcpip.h>
 
 #include <cerrno>
-#include <fenv.h>
+#include <cfenv>
 #include <io.h>
 #include <objbase.h>
 #include <process.h>
@@ -204,19 +210,37 @@ void dbg_msg(const char *sys, const char *fmt, ...)
 
 /* */
 
-void mem_copy(void *dest, const void *source, unsigned size)
+void mem_copy(void *dest, const void *source, size_t size)
 {
 	memcpy(dest, source, size);
 }
 
-void mem_move(void *dest, const void *source, unsigned size)
+void mem_move(void *dest, const void *source, size_t size)
 {
 	memmove(dest, source, size);
 }
 
-void mem_zero(void *block, unsigned size)
+void mem_zero(void *block, size_t size)
 {
 	memset(block, 0, size);
+}
+
+int mem_comp(const void *a, const void *b, size_t size)
+{
+	return memcmp(a, b, size);
+}
+
+bool mem_has_null(const void *block, size_t size)
+{
+	const unsigned char *bytes = (const unsigned char *)block;
+	for(size_t i = 0; i < size; i++)
+	{
+		if(bytes[i] == 0)
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 IOHANDLE io_open_impl(const char *filename, int flags)
@@ -360,12 +384,12 @@ unsigned io_write(IOHANDLE io, const void *buffer, unsigned size)
 	return fwrite(buffer, 1, size, (FILE *)io);
 }
 
-unsigned io_write_newline(IOHANDLE io)
+bool io_write_newline(IOHANDLE io)
 {
 #if defined(CONF_FAMILY_WINDOWS)
-	return fwrite("\r\n", 1, 2, (FILE *)io);
+	return io_write(io, "\r\n", 2) == 2;
 #else
-	return fwrite("\n", 1, 1, (FILE *)io);
+	return io_write(io, "\n", 1) == 1;
 #endif
 }
 
@@ -742,7 +766,7 @@ void *thread_init(void (*threadfunc)(void *), void *u, const char *name)
 		pthread_t id;
 		pthread_attr_t attr;
 		pthread_attr_init(&attr);
-#if defined(CONF_PLATFORM_MACOS)
+#if defined(CONF_PLATFORM_MACOS) && defined(__MAC_10_10) && __MAC_OS_X_VERSION_MIN_REQUIRED >= __MAC_10_10
 		pthread_attr_set_qos_class_np(&attr, QOS_CLASS_USER_INTERACTIVE, 0);
 #endif
 		int result = pthread_create(&id, &attr, thread_run, data);
@@ -1113,14 +1137,14 @@ void net_addr_str_v6(const unsigned short ip[8], int port, char *buffer, int buf
 		longest_seq_len = 0;
 		longest_seq_start = -1;
 	}
-	w += str_format(buffer + w, buffer_size - w, "[");
+	w += str_copy(buffer + w, "[", buffer_size - w);
 	for(i = 0; i < 8; i++)
 	{
 		if(longest_seq_start <= i && i < longest_seq_start + longest_seq_len)
 		{
 			if(i == longest_seq_start)
 			{
-				w += str_format(buffer + w, buffer_size - w, "::");
+				w += str_copy(buffer + w, "::", buffer_size - w);
 			}
 		}
 		else
@@ -1129,7 +1153,7 @@ void net_addr_str_v6(const unsigned short ip[8], int port, char *buffer, int buf
 			w += str_format(buffer + w, buffer_size - w, "%s%x", colon, ip[i]);
 		}
 	}
-	w += str_format(buffer + w, buffer_size - w, "]");
+	w += str_copy(buffer + w, "]", buffer_size - w);
 	if(port >= 0)
 	{
 		str_format(buffer + w, buffer_size - w, ":%d", port);
@@ -1437,7 +1461,7 @@ static int priv_net_close_all_sockets(NETSOCKET sock)
 }
 
 #if defined(CONF_FAMILY_WINDOWS)
-static char *windows_format_system_message(unsigned long error)
+char *windows_format_system_message(unsigned long error)
 {
 	WCHAR *wide_message;
 	const DWORD flags = FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_MAX_WIDTH_MASK;
@@ -1871,56 +1895,39 @@ NETSOCKET net_tcp_create(NETADDR bindaddr)
 	return sock;
 }
 
-int net_set_non_blocking(NETSOCKET sock)
+static int net_set_blocking_impl(NETSOCKET sock, bool blocking)
 {
-	unsigned long mode = 1;
-	if(sock->ipv4sock >= 0)
-	{
-#if defined(CONF_FAMILY_WINDOWS)
-		ioctlsocket(sock->ipv4sock, FIONBIO, (unsigned long *)&mode);
-#else
-		if(ioctl(sock->ipv4sock, FIONBIO, (unsigned long *)&mode) == -1)
-			dbg_msg("socket", "setting ipv4 non-blocking failed: %d", errno);
-#endif
-	}
+	unsigned long mode = blocking ? 0 : 1;
+	const char *mode_str = blocking ? "blocking" : "non-blocking";
+	int sockets[] = {sock->ipv4sock, sock->ipv6sock};
+	const char *socket_str[] = {"ipv4", "ipv6"};
 
-	if(sock->ipv6sock >= 0)
+	for(size_t i = 0; i < std::size(sockets); ++i)
 	{
+		if(sockets[i] >= 0)
+		{
 #if defined(CONF_FAMILY_WINDOWS)
-		ioctlsocket(sock->ipv6sock, FIONBIO, (unsigned long *)&mode);
+			int result = ioctlsocket(sockets[i], FIONBIO, (unsigned long *)&mode);
+			if(result != NO_ERROR)
+				dbg_msg("socket", "setting %s %s failed: %d", socket_str[i], mode_str, result);
 #else
-		if(ioctl(sock->ipv6sock, FIONBIO, (unsigned long *)&mode) == -1)
-			dbg_msg("socket", "setting ipv6 non-blocking failed: %d", errno);
+			if(ioctl(sockets[i], FIONBIO, (unsigned long *)&mode) == -1)
+				dbg_msg("socket", "setting %s %s failed: %d", socket_str[i], mode_str, errno);
 #endif
+		}
 	}
 
 	return 0;
 }
 
+int net_set_non_blocking(NETSOCKET sock)
+{
+	return net_set_blocking_impl(sock, false);
+}
+
 int net_set_blocking(NETSOCKET sock)
 {
-	unsigned long mode = 0;
-	if(sock->ipv4sock >= 0)
-	{
-#if defined(CONF_FAMILY_WINDOWS)
-		ioctlsocket(sock->ipv4sock, FIONBIO, (unsigned long *)&mode);
-#else
-		if(ioctl(sock->ipv4sock, FIONBIO, (unsigned long *)&mode) == -1)
-			dbg_msg("socket", "setting ipv4 blocking failed: %d", errno);
-#endif
-	}
-
-	if(sock->ipv6sock >= 0)
-	{
-#if defined(CONF_FAMILY_WINDOWS)
-		ioctlsocket(sock->ipv6sock, FIONBIO, (unsigned long *)&mode);
-#else
-		if(ioctl(sock->ipv6sock, FIONBIO, (unsigned long *)&mode) == -1)
-			dbg_msg("socket", "setting ipv6 blocking failed: %d", errno);
-#endif
-	}
-
-	return 0;
+	return net_set_blocking_impl(sock, true);
 }
 
 int net_tcp_listen(NETSOCKET sock, int backlog)
@@ -2333,6 +2340,21 @@ int fs_removedir(const char *path)
 #endif
 }
 
+int fs_is_file(const char *path)
+{
+#if defined(CONF_FAMILY_WINDOWS)
+	WCHAR wPath[IO_MAX_PATH_LENGTH];
+	dbg_assert(MultiByteToWideChar(CP_UTF8, 0, path, -1, wPath, std::size(wPath)) > 0, "MultiByteToWideChar failure");
+	DWORD attributes = GetFileAttributesW(wPath);
+	return attributes != INVALID_FILE_ATTRIBUTES && !(attributes & FILE_ATTRIBUTE_DIRECTORY) ? 1 : 0;
+#else
+	struct stat sb;
+	if(stat(path, &sb) == -1)
+		return 0;
+	return S_ISREG(sb.st_mode) ? 1 : 0;
+#endif
+}
+
 int fs_is_dir(const char *path)
 {
 #if defined(CONF_FAMILY_WINDOWS)
@@ -2614,11 +2636,11 @@ void str_append(char *dst, const char *src, int dst_size)
 	str_utf8_fix_truncation(dst);
 }
 
-void str_copy(char *dst, const char *src, int dst_size)
+int str_copy(char *dst, const char *src, int dst_size)
 {
 	dst[0] = '\0';
 	strncat(dst, src, dst_size - 1);
-	str_utf8_fix_truncation(dst);
+	return str_utf8_fix_truncation(dst);
 }
 
 void str_utf8_truncate(char *dst, int dst_size, const char *src, int truncation_len)
@@ -2653,24 +2675,25 @@ int str_length(const char *str)
 	return (int)strlen(str);
 }
 
-int str_format(char *buffer, int buffer_size, const char *format, ...)
+int str_format_v(char *buffer, int buffer_size, const char *format, va_list args)
 {
 #if defined(CONF_FAMILY_WINDOWS)
-	va_list ap;
-	va_start(ap, format);
-	_vsprintf_p(buffer, buffer_size, format, ap);
-	va_end(ap);
-
+	_vsprintf_p(buffer, buffer_size, format, args);
 	buffer[buffer_size - 1] = 0; /* assure null termination */
 #else
-	va_list ap;
-	va_start(ap, format);
-	vsnprintf(buffer, buffer_size, format, ap);
-	va_end(ap);
-
+	vsnprintf(buffer, buffer_size, format, args);
 	/* null termination is assured by definition of vsnprintf */
 #endif
 	return str_utf8_fix_truncation(buffer);
+}
+
+int str_format(char *buffer, int buffer_size, const char *format, ...)
+{
+	va_list args;
+	va_start(args, format);
+	int length = str_format_v(buffer, buffer_size, format, args);
+	va_end(args);
+	return length;
 }
 
 const char *str_trim_words(const char *str, int words)
@@ -3078,6 +3101,39 @@ void str_hex(char *dst, int dst_size, const void *data, int data_size)
 	dst[dst_index] = '\0';
 }
 
+void str_hex_cstyle(char *dst, int dst_size, const void *data, int data_size, int bytes_per_line)
+{
+	static const char hex[] = "0123456789ABCDEF";
+	int data_index;
+	int dst_index;
+	int remaining_bytes_per_line = bytes_per_line;
+	for(data_index = 0, dst_index = 0; data_index < data_size && dst_index < dst_size - 6; data_index++)
+	{
+		--remaining_bytes_per_line;
+		dst[data_index * 6] = '0';
+		dst[data_index * 6 + 1] = 'x';
+		dst[data_index * 6 + 2] = hex[((const unsigned char *)data)[data_index] >> 4];
+		dst[data_index * 6 + 3] = hex[((const unsigned char *)data)[data_index] & 0xf];
+		dst[data_index * 6 + 4] = ',';
+		if(remaining_bytes_per_line == 0)
+		{
+			dst[data_index * 6 + 5] = '\n';
+			remaining_bytes_per_line = bytes_per_line;
+		}
+		else
+		{
+			dst[data_index * 6 + 5] = ' ';
+		}
+		dst_index += 6;
+	}
+	dst[dst_index] = '\0';
+	// Remove trailing comma and space/newline
+	if(dst_index >= 1)
+		dst[dst_index - 1] = '\0';
+	if(dst_index >= 2)
+		dst[dst_index - 2] = '\0';
+}
+
 static int hexval(char x)
 {
 	switch(x)
@@ -3355,7 +3411,7 @@ int str_time(int64_t centisecs, int format, char *buffer, int buffer_size)
 
 int str_time_float(float secs, int format, char *buffer, int buffer_size)
 {
-	return str_time(llroundf(secs * 100), format, buffer, buffer_size);
+	return str_time(llroundf(secs * 1000) / 10, format, buffer, buffer_size);
 }
 
 void str_escape(char **dst, const char *src, const char *end)
@@ -3372,25 +3428,6 @@ void str_escape(char **dst, const char *src, const char *end)
 		*(*dst)++ = *src++;
 	}
 	**dst = 0;
-}
-
-int mem_comp(const void *a, const void *b, int size)
-{
-	return memcmp(a, b, size);
-}
-
-int mem_has_null(const void *block, unsigned size)
-{
-	const unsigned char *bytes = (const unsigned char *)block;
-	unsigned i;
-	for(i = 0; i < size; i++)
-	{
-		if(bytes[i] == 0)
-		{
-			return 1;
-		}
-	}
-	return 0;
 }
 
 void net_stats(NETSTATS *stats_inout)
@@ -3786,33 +3823,8 @@ const char *str_next_token(const char *str, const char *delim, char *buffer, int
 	return tok + len;
 }
 
-int bytes_be_to_int(const unsigned char *bytes)
-{
-	int Result;
-	unsigned char *pResult = (unsigned char *)&Result;
-	for(unsigned i = 0; i < sizeof(int); i++)
-	{
-#if defined(CONF_ARCH_ENDIAN_BIG)
-		pResult[i] = bytes[i];
-#else
-		pResult[i] = bytes[sizeof(int) - i - 1];
-#endif
-	}
-	return Result;
-}
-
-void int_to_bytes_be(unsigned char *bytes, int value)
-{
-	const unsigned char *pValue = (const unsigned char *)&value;
-	for(unsigned i = 0; i < sizeof(int); i++)
-	{
-#if defined(CONF_ARCH_ENDIAN_BIG)
-		bytes[i] = pValue[i];
-#else
-		bytes[sizeof(int) - i - 1] = pValue[i];
-#endif
-	}
-}
+static_assert(sizeof(unsigned) == 4, "unsigned must be 4 bytes in size");
+static_assert(sizeof(unsigned) == sizeof(int), "unsigned and int must have the same size");
 
 unsigned bytes_be_to_uint(const unsigned char *bytes)
 {
@@ -3921,7 +3933,12 @@ PROCESS shell_execute(const char *file)
 int kill_process(PROCESS process)
 {
 #if defined(CONF_FAMILY_WINDOWS)
-	return TerminateProcess(process, 0);
+	BOOL success = TerminateProcess(process, 0);
+	if(success)
+	{
+		CloseHandle(process);
+	}
+	return success;
 #elif defined(CONF_FAMILY_UNIX)
 	int status;
 	kill(process, SIGTERM);
@@ -4232,6 +4249,72 @@ int os_version_str(char *version, int length)
 	str_format(version, length, "%s %s (%s, %s)%s", u.sysname, u.release, u.machine, u.version, extra);
 	return 0;
 #endif
+}
+
+void os_locale_str(char *locale, size_t length)
+{
+#if defined(CONF_FAMILY_WINDOWS)
+	wchar_t wide_buffer[LOCALE_NAME_MAX_LENGTH];
+	dbg_assert(GetUserDefaultLocaleName(wide_buffer, std::size(wide_buffer)) > 0, "GetUserDefaultLocaleName failure");
+
+	// Assume maximum possible length for encoding as UTF-8.
+	char buffer[UTF8_BYTE_LENGTH * LOCALE_NAME_MAX_LENGTH + 1];
+	dbg_assert(WideCharToMultiByte(CP_UTF8, 0, wide_buffer, -1, buffer, sizeof(buffer), NULL, NULL) > 0, "WideCharToMultiByte failure");
+
+	str_copy(locale, buffer, length);
+#elif defined(CONF_PLATFORM_MACOS)
+	CFLocaleRef locale_ref = CFLocaleCopyCurrent();
+	CFStringRef locale_identifier_ref = static_cast<CFStringRef>(CFLocaleGetValue(locale_ref, kCFLocaleIdentifier));
+
+	// Count number of UTF16 codepoints, +1 for zero-termination.
+	// Assume maximum possible length for encoding as UTF-8.
+	CFIndex locale_identifier_size = (UTF8_BYTE_LENGTH * CFStringGetLength(locale_identifier_ref) + 1) * sizeof(char);
+	char *locale_identifier = (char *)malloc(locale_identifier_size);
+	dbg_assert(CFStringGetCString(locale_identifier_ref, locale_identifier, locale_identifier_size, kCFStringEncodingUTF8), "CFStringGetCString failure");
+
+	str_copy(locale, locale_identifier, length);
+
+	free(locale_identifier);
+	CFRelease(locale_ref);
+#else
+	static const char *ENV_VARIABLES[] = {
+		"LC_ALL",
+		"LC_MESSAGES",
+		"LANG",
+	};
+
+	locale[0] = '\0';
+	for(const char *env_variable : ENV_VARIABLES)
+	{
+		const char *env_value = getenv(env_variable);
+		if(env_value)
+		{
+			str_copy(locale, env_value, length);
+			break;
+		}
+	}
+#endif
+
+	// Ensure RFC 3066 format:
+	// - use hyphens instead of underscores
+	// - truncate locale string after first non-standard letter
+	for(int i = 0; i < str_length(locale); ++i)
+	{
+		if(locale[i] == '_')
+		{
+			locale[i] = '-';
+		}
+		else if(locale[i] != '-' && !(locale[i] >= 'a' && locale[i] <= 'z') && !(locale[i] >= 'A' && locale[i] <= 'Z') && !(locale[i] >= '0' && locale[i] <= '9'))
+		{
+			locale[i] = '\0';
+			break;
+		}
+	}
+
+	// Use default if we could not determine the locale,
+	// i.e. if only the C or POSIX locale is available.
+	if(locale[0] == '\0' || str_comp(locale, "C") == 0 || str_comp(locale, "POSIX") == 0)
+		str_copy(locale, "en-US", length);
 }
 
 #if defined(CONF_EXCEPTION_HANDLING)

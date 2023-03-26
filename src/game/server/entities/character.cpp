@@ -830,12 +830,12 @@ void CCharacter::TickDeferred()
 		int Events = m_Core.m_TriggeredEvents;
 		int CID = m_pPlayer->GetCID();
 
-		int64_t TeamMask = Teams()->TeamMask(Team(), -1, CID);
+		CClientMask TeamMask = Teams()->TeamMask(Team(), -1, CID);
 		// Some sounds are triggered client-side for the acting player
 		// so we need to avoid duplicating them
-		int64_t TeamMaskExceptSelf = Teams()->TeamMask(Team(), CID, CID);
+		CClientMask TeamMaskExceptSelf = Teams()->TeamMask(Team(), CID, CID);
 		// Some are triggered client-side but only on Sixup
-		int64_t TeamMaskExceptSelfIfSixup = Server()->IsSixup(CID) ? TeamMaskExceptSelf : TeamMask;
+		CClientMask TeamMaskExceptSelfIfSixup = Server()->IsSixup(CID) ? TeamMaskExceptSelf : TeamMask;
 
 		if(Events & COREEVENT_GROUND_JUMP)
 			GameServer()->CreateSound(m_Pos, SOUND_PLAYER_JUMP, TeamMaskExceptSelf);
@@ -1022,7 +1022,7 @@ void CCharacter::SnapCharacter(int SnappingClient, int ID)
 		Health = m_Health;
 		Armor = m_Armor;
 		if(m_Core.m_aWeapons[m_Core.m_ActiveWeapon].m_Ammo > 0)
-			AmmoCount = (m_FreezeTime > 0) ? m_Core.m_aWeapons[m_Core.m_ActiveWeapon].m_Ammo : 0;
+			AmmoCount = (m_FreezeTime == 0) ? m_Core.m_aWeapons[m_Core.m_ActiveWeapon].m_Ammo : 0;
 	}
 
 	if(GetPlayer()->IsAfk() || GetPlayer()->IsPaused())
@@ -1041,7 +1041,7 @@ void CCharacter::SnapCharacter(int SnappingClient, int ID)
 
 	if(!Server()->IsSixup(SnappingClient))
 	{
-		CNetObj_Character *pCharacter = static_cast<CNetObj_Character *>(Server()->SnapNewItem(NETOBJTYPE_CHARACTER, ID, sizeof(CNetObj_Character)));
+		CNetObj_Character *pCharacter = Server()->SnapNewItem<CNetObj_Character>(ID);
 		if(!pCharacter)
 			return;
 
@@ -1066,7 +1066,7 @@ void CCharacter::SnapCharacter(int SnappingClient, int ID)
 	}
 	else
 	{
-		protocol7::CNetObj_Character *pCharacter = static_cast<protocol7::CNetObj_Character *>(Server()->SnapNewItem(NETOBJTYPE_CHARACTER, ID, sizeof(protocol7::CNetObj_Character)));
+		protocol7::CNetObj_Character *pCharacter = Server()->SnapNewItem<protocol7::CNetObj_Character>(ID);
 		if(!pCharacter)
 			return;
 
@@ -1152,7 +1152,7 @@ void CCharacter::Snap(int SnappingClient)
 
 	SnapCharacter(SnappingClient, ID);
 
-	CNetObj_DDNetCharacter *pDDNetCharacter = static_cast<CNetObj_DDNetCharacter *>(Server()->SnapNewItem(NETOBJTYPE_DDNETCHARACTER, ID, sizeof(CNetObj_DDNetCharacter)));
+	CNetObj_DDNetCharacter *pDDNetCharacter = Server()->SnapNewItem<CNetObj_DDNetCharacter>(ID);
 	if(!pDDNetCharacter)
 		return;
 
@@ -1330,36 +1330,36 @@ void CCharacter::HandleSkippableTiles(int Index)
 			if(MaxSpeed > 0)
 			{
 				if(Direction.x > 0.0000001f)
-					SpeederAngle = -atan(Direction.y / Direction.x);
+					SpeederAngle = -std::atan(Direction.y / Direction.x);
 				else if(Direction.x < 0.0000001f)
-					SpeederAngle = atan(Direction.y / Direction.x) + 2.0f * asin(1.0f);
+					SpeederAngle = std::atan(Direction.y / Direction.x) + 2.0f * std::asin(1.0f);
 				else if(Direction.y > 0.0000001f)
-					SpeederAngle = asin(1.0f);
+					SpeederAngle = std::asin(1.0f);
 				else
-					SpeederAngle = asin(-1.0f);
+					SpeederAngle = std::asin(-1.0f);
 
 				if(SpeederAngle < 0)
-					SpeederAngle = 4.0f * asin(1.0f) + SpeederAngle;
+					SpeederAngle = 4.0f * std::asin(1.0f) + SpeederAngle;
 
 				if(TempVel.x > 0.0000001f)
-					TeeAngle = -atan(TempVel.y / TempVel.x);
+					TeeAngle = -std::atan(TempVel.y / TempVel.x);
 				else if(TempVel.x < 0.0000001f)
-					TeeAngle = atan(TempVel.y / TempVel.x) + 2.0f * asin(1.0f);
+					TeeAngle = std::atan(TempVel.y / TempVel.x) + 2.0f * std::asin(1.0f);
 				else if(TempVel.y > 0.0000001f)
-					TeeAngle = asin(1.0f);
+					TeeAngle = std::asin(1.0f);
 				else
-					TeeAngle = asin(-1.0f);
+					TeeAngle = std::asin(-1.0f);
 
 				if(TeeAngle < 0)
-					TeeAngle = 4.0f * asin(1.0f) + TeeAngle;
+					TeeAngle = 4.0f * std::asin(1.0f) + TeeAngle;
 
-				TeeSpeed = sqrt(pow(TempVel.x, 2) + pow(TempVel.y, 2));
+				TeeSpeed = std::sqrt(std::pow(TempVel.x, 2) + std::pow(TempVel.y, 2));
 
 				DiffAngle = SpeederAngle - TeeAngle;
-				SpeedLeft = MaxSpeed / 5.0f - cos(DiffAngle) * TeeSpeed;
-				if(abs((int)SpeedLeft) > Force && SpeedLeft > 0.0000001f)
+				SpeedLeft = MaxSpeed / 5.0f - std::cos(DiffAngle) * TeeSpeed;
+				if(absolute((int)SpeedLeft) > Force && SpeedLeft > 0.0000001f)
 					TempVel += Direction * Force;
-				else if(abs((int)SpeedLeft) > Force)
+				else if(absolute((int)SpeedLeft) > Force)
 					TempVel += Direction * -Force;
 				else
 					TempVel += Direction * SpeedLeft;
@@ -1733,7 +1733,7 @@ void CCharacter::HandleTiles(int Index)
 		{
 			char aBuf[256];
 			if(NewJumps == -1)
-				str_format(aBuf, sizeof(aBuf), "You only have your ground jump now");
+				str_copy(aBuf, "You only have your ground jump now");
 			else if(NewJumps == 1)
 				str_format(aBuf, sizeof(aBuf), "You can jump %d time", NewJumps);
 			else
@@ -2322,7 +2322,7 @@ void CCharacter::Rescue()
 	}
 }
 
-int64_t CCharacter::TeamMask()
+CClientMask CCharacter::TeamMask()
 {
 	return Teams()->TeamMask(Team(), -1, GetPlayer()->GetCID());
 }

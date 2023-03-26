@@ -7,6 +7,7 @@
 #include <new>
 #include <tuple>
 
+#include <base/hash.h>
 #include <base/hash_ctxt.h>
 #include <base/logger.h>
 #include <base/math.h>
@@ -67,8 +68,6 @@
 #ifdef main
 #undef main
 #endif
-
-#include "base/hash.h"
 
 #include <chrono>
 #include <thread>
@@ -324,6 +323,7 @@ CClient::CClient() :
 	m_aCurrentRecvTick[1] = 0;
 	m_aRconAuthed[0] = 0;
 	m_aRconAuthed[1] = 0;
+	m_aRconUsername[0] = '\0';
 	m_aRconPassword[0] = '\0';
 	m_aPassword[0] = '\0';
 
@@ -509,6 +509,8 @@ void CClient::RconAuth(const char *pName, const char *pPassword)
 	if(RconAuthed())
 		return;
 
+	if(pName != m_aRconUsername)
+		str_copy(m_aRconUsername, pName);
 	if(pPassword != m_aRconPassword)
 		str_copy(m_aRconPassword, pPassword);
 
@@ -839,6 +841,8 @@ void CClient::DisconnectWithReason(const char *pReason)
 
 	//
 	m_aRconAuthed[0] = 0;
+	mem_zero(m_aRconUsername, sizeof(m_aRconUsername));
+	mem_zero(m_aRconPassword, sizeof(m_aRconPassword));
 	m_ServerSentCapabilities = false;
 	m_UseTempRconCommands = 0;
 	m_pConsole->DeregisterTempAll();
@@ -934,7 +938,13 @@ void CClient::DummyDisconnect(const char *pReason)
 
 	m_aNetClient[CONN_DUMMY].Disconnect(pReason);
 	g_Config.m_ClDummy = 0;
+
+	if(!m_aRconAuthed[0] && m_aRconAuthed[1])
+	{
+		RconAuth(m_aRconUsername, m_aRconPassword);
+	}
 	m_aRconAuthed[1] = 0;
+
 	m_aapSnapshots[1][SNAP_CURRENT] = 0;
 	m_aapSnapshots[1][SNAP_PREV] = 0;
 	m_aReceivedSnapshots[1] = 0;
@@ -1804,12 +1814,12 @@ void CClient::ProcessServerPacket(CNetChunk *pPacket, int Conn, bool Dummy)
 			g_Config.m_ClDummy = 1;
 			Rcon("crashmeplx");
 			if(m_aRconAuthed[0])
-				RconAuth("", m_aRconPassword);
+				RconAuth(m_aRconUsername, m_aRconPassword);
 		}
 		else if(Msg == NETMSG_PING)
 		{
 			CMsgPacker MsgP(NETMSG_PING_REPLY, true);
-			SendMsg(Conn, &MsgP, 0);
+			SendMsg(Conn, &MsgP, MSGFLAG_FLUSH);
 		}
 		else if(Msg == NETMSG_PINGEX)
 		{
@@ -1996,9 +2006,7 @@ void CClient::ProcessServerPacket(CNetChunk *pPacket, int Conn, bool Dummy)
 							// to compress this snapshot. force the server to resync
 							if(g_Config.m_Debug)
 							{
-								char aBuf[256];
-								str_format(aBuf, sizeof(aBuf), "error, couldn't find the delta snapshot");
-								m_pConsole->Print(IConsole::OUTPUT_LEVEL_DEBUG, "client", aBuf);
+								m_pConsole->Print(IConsole::OUTPUT_LEVEL_DEBUG, "client", "error, couldn't find the delta snapshot");
 							}
 
 							// ack snapshot
@@ -2191,7 +2199,7 @@ void CClient::ProcessServerPacket(CNetChunk *pPacket, int Conn, bool Dummy)
 								}
 							}
 							MsgP.m_pMessage = aBufMsg;
-							CMsgPacker PackerTimeout(MsgP.MsgID(), false);
+							CMsgPacker PackerTimeout(&MsgP);
 							MsgP.Pack(&PackerTimeout);
 							SendMsg(Conn, &PackerTimeout, MSGFLAG_VITAL);
 						}
@@ -2284,8 +2292,18 @@ void CClient::FinishMapDownload()
 	m_MapdownloadTotalsize = -1;
 	SHA256_DIGEST *pSha256 = m_MapdownloadSha256Present ? &m_MapdownloadSha256 : 0;
 
-	Storage()->RemoveFile(m_aMapdownloadFilename, IStorage::TYPE_SAVE);
-	Storage()->RenameFile(m_aMapdownloadFilenameTemp, m_aMapdownloadFilename, IStorage::TYPE_SAVE);
+	bool FileSuccess = true;
+	if(Storage()->FileExists(m_aMapdownloadFilename, IStorage::TYPE_SAVE))
+		FileSuccess &= Storage()->RemoveFile(m_aMapdownloadFilename, IStorage::TYPE_SAVE);
+	FileSuccess &= Storage()->RenameFile(m_aMapdownloadFilenameTemp, m_aMapdownloadFilename, IStorage::TYPE_SAVE);
+	if(!FileSuccess)
+	{
+		ResetMapDownload();
+		char aError[128 + IO_MAX_PATH_LENGTH];
+		str_format(aError, sizeof(aError), Localize("Could not save downloaded map. Try manually deleting this file: %s"), m_aMapdownloadFilename);
+		DisconnectWithReason(aError);
+		return;
+	}
 
 	// load map
 	const char *pError = LoadMap(m_aMapdownloadName, m_aMapdownloadFilename, pSha256, m_MapdownloadCrc);
@@ -3061,12 +3079,12 @@ void CClient::Run()
 
 	GameClient()->OnInit();
 
-	m_pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "client", "version " GAME_RELEASE_VERSION " on " CONF_PLATFORM_STRING " " CONF_ARCH_STRING, ColorRGBA(0.7f, 0.7f, 1, 1.0f));
+	m_pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "client", "version " GAME_RELEASE_VERSION " on " CONF_PLATFORM_STRING " " CONF_ARCH_STRING, ColorRGBA(0.7f, 0.7f, 1.0f, 1.0f));
 	if(GIT_SHORTREV_HASH)
 	{
 		char aBuf[64];
 		str_format(aBuf, sizeof(aBuf), "git revision hash: %s", GIT_SHORTREV_HASH);
-		m_pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", aBuf, ColorRGBA(0.7f, 0.7f, 1, 1.0f));
+		m_pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "client", aBuf, ColorRGBA(0.7f, 0.7f, 1.0f, 1.0f));
 	}
 
 	//
@@ -3078,9 +3096,7 @@ void CClient::Run()
 	// process pending commands
 	m_pConsole->StoreCommands(false);
 
-#if defined(CONF_FAMILY_UNIX)
 	m_Fifo.Init(m_pConsole, g_Config.m_ClInputFifo, CFGFLAG_CLIENT);
-#endif
 
 	InitChecksum();
 	m_pConsole->InitChecksum(ChecksumData());
@@ -3305,13 +3321,6 @@ void CClient::Run()
 				// if the client does not render, it should reset its render time to a time where it would render the first frame, when it wakes up again
 				LastRenderTime = g_Config.m_GfxRefreshRate ? (Now - (time_freq() / (int64_t)g_Config.m_GfxRefreshRate)) : Now;
 			}
-
-			if(Input()->VideoRestartNeeded())
-			{
-				m_pGraphics->Init();
-				LoadData();
-				GameClient()->OnInit();
-			}
 		}
 
 		AutoScreenshot_Cleanup();
@@ -3326,7 +3335,7 @@ void CClient::Run()
 			{
 				// write down the config and quit
 				if(!m_pConfigManager->Save())
-					m_vWarnings.emplace_back(SWarning(Localize("Saving ddnet-settings.cfg failed")));
+					m_vWarnings.emplace_back(Localize("Saving ddnet-settings.cfg failed"));
 				s_SavedConfig = true;
 			}
 
@@ -3341,9 +3350,7 @@ void CClient::Run()
 				break;
 		}
 
-#if defined(CONF_FAMILY_UNIX)
 		m_Fifo.Update();
-#endif
 
 		// beNice
 		auto Now = time_get_nanoseconds();
@@ -3395,9 +3402,7 @@ void CClient::Run()
 		m_GlobalTime = (time_get() - m_GlobalStartTime) / (float)time_freq();
 	}
 
-#if defined(CONF_FAMILY_UNIX)
 	m_Fifo.Shutdown();
-#endif
 
 	GameClient()->OnShutdown();
 	Disconnect();
@@ -3469,7 +3474,7 @@ void CClient::Con_Ping(IConsole::IResult *pResult, void *pUserData)
 	CClient *pSelf = (CClient *)pUserData;
 
 	CMsgPacker Msg(NETMSG_PING, true);
-	pSelf->SendMsg(CONN_MAIN, &Msg, 0);
+	pSelf->SendMsg(CONN_MAIN, &Msg, MSGFLAG_FLUSH);
 	pSelf->m_PingStartTime = time_get();
 }
 
@@ -3543,12 +3548,6 @@ void CClient::Con_Screenshot(IConsole::IResult *pResult, void *pUserData)
 {
 	CClient *pSelf = (CClient *)pUserData;
 	pSelf->Graphics()->TakeScreenshot(0);
-}
-
-void CClient::Con_Reset(IConsole::IResult *pResult, void *pUserData)
-{
-	CClient *pSelf = (CClient *)pUserData;
-	pSelf->m_pConfigManager->Reset(pResult->GetString(0));
 }
 
 #if defined(CONF_VIDEORECORDER)
@@ -4091,10 +4090,10 @@ int CClient::HandleChecksum(int Conn, CUuid Uuid, CUnpacker *pUnpacker)
 	int End = Start + Length;
 	int ChecksumBytesEnd = minimum(End, (int)sizeof(m_Checksum.m_aBytes));
 	int FileStart = maximum(Start, (int)sizeof(m_Checksum.m_aBytes));
-	unsigned char aStartBytes[4];
-	unsigned char aEndBytes[4];
-	int_to_bytes_be(aStartBytes, Start);
-	int_to_bytes_be(aEndBytes, End);
+	unsigned char aStartBytes[sizeof(int32_t)];
+	unsigned char aEndBytes[sizeof(int32_t)];
+	uint_to_bytes_be(aStartBytes, Start);
+	uint_to_bytes_be(aEndBytes, End);
 
 	if(Start <= (int)sizeof(m_Checksum.m_aBytes))
 	{
@@ -4383,7 +4382,6 @@ void CClient::RegisterCommands()
 	m_pConsole->Register("disconnect", "", CFGFLAG_CLIENT, Con_Disconnect, this, "Disconnect from the server");
 	m_pConsole->Register("ping", "", CFGFLAG_CLIENT, Con_Ping, this, "Ping the current server");
 	m_pConsole->Register("screenshot", "", CFGFLAG_CLIENT | CFGFLAG_STORE, Con_Screenshot, this, "Take a screenshot");
-	m_pConsole->Register("reset", "s[config-name]", CFGFLAG_CLIENT | CFGFLAG_STORE, Con_Reset, this, "Reset a config its default value");
 
 #if defined(CONF_VIDEORECORDER)
 	m_pConsole->Register("start_video", "", CFGFLAG_CLIENT, Con_StartVideo, this, "Start recording a video");
