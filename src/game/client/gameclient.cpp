@@ -604,7 +604,39 @@ void CGameClient::UpdatePositions()
 	// spectator position
 	if(m_Snap.m_SpecInfo.m_Active)
 	{
-		if(Client()->State() == IClient::STATE_DEMOPLAYBACK && m_DemoSpecID != SPEC_FOLLOW && m_Snap.m_SpecInfo.m_SpectatorID != SPEC_FREEVIEW)
+		if(!m_MultiViewIsInit && m_MultiViewActivated && m_Snap.m_SpecInfo.m_SpectatorID == SPEC_FREEVIEW)
+		{
+			// Pick a player out of freeview
+			if(!InitMultiViewFromFreeview(0))
+			{
+				dbg_msg("MultiView", "No players found to spectate");
+				m_MultiViewActivated = false;
+			}
+		}
+		else if(!m_MultiViewIsInit && m_MultiViewActivated && m_Snap.m_SpecInfo.m_SpectatorID >= 0)
+		{
+			int team = m_Teams.Team(m_Snap.m_SpecInfo.m_SpectatorID);
+			if(team == 0)
+			{
+				if(!InitMultiViewFromFreeview(0))
+				{
+					dbg_msg("MultiView", "No players found to spectate");
+					m_MultiViewActivated = false;
+				}
+				dbg_msg("MultiView", "Cant spectate t0 with no ids");
+			}
+			// Pick all players from the team
+			if(!InitMultiViewFromFreeview(team))
+			{
+				dbg_msg("MultiView", "No players found to spectate in that team");
+				m_MultiViewActivated = false;
+			}
+		}
+		else if(m_MultiViewActivated)
+		{
+			HandleMultiView();
+		}
+		else if(Client()->State() == IClient::STATE_DEMOPLAYBACK && m_DemoSpecID != SPEC_FOLLOW && m_Snap.m_SpecInfo.m_SpectatorID != SPEC_FREEVIEW)
 		{
 			m_Snap.m_SpecInfo.m_Position = mix(
 				vec2(m_Snap.m_aCharacters[m_Snap.m_SpecInfo.m_SpectatorID].m_Prev.m_X, m_Snap.m_aCharacters[m_Snap.m_SpecInfo.m_SpectatorID].m_Prev.m_Y),
@@ -620,7 +652,17 @@ void CGameClient::UpdatePositions()
 			else
 				m_Snap.m_SpecInfo.m_Position = vec2(m_Snap.m_pSpectatorInfo->m_X, m_Snap.m_pSpectatorInfo->m_Y);
 			m_Snap.m_SpecInfo.m_UsePosition = true;
+
+			CleanIds();
 		}
+
+		if(!m_MultiViewActivated)
+			ResetMultiView();
+	}
+	else
+	{
+		ResetMultiView();
+		CleanIds();
 	}
 
 	UpdateRenderedCharacters();
@@ -842,6 +884,18 @@ void CGameClient::OnMessage(int MsgId, CUnpacker *pUnpacker, int Conn, bool Dumm
 			if(CCharacter *pChar = m_GameWorld.GetCharacterByID(pMsg->m_Victim))
 				pChar->ResetPrediction();
 			m_GameWorld.ReleaseHooked(pMsg->m_Victim);
+		}
+
+		if(IsIDsActivated() && m_MultiViewId[pMsg->m_Victim] && !m_aClients[pMsg->m_Victim].m_Spec) // this does not work
+		{
+			// is MultiView even activated and we are not spectating a solo guy
+			if(m_MultiViewActivated && !m_MultiViewSolo && m_MultiViewTeam == 0)
+			{
+				m_MultiViewId[pMsg->m_Victim] = false;
+			}
+
+			if(!IsIDsActivated())
+				m_MultiViewActivated = false;
 		}
 	}
 }
@@ -1666,7 +1720,16 @@ void CGameClient::OnNewSnapshot()
 		m_aDDRaceMsgSent[i] = true;
 	}
 
-	if(m_aShowOthers[g_Config.m_ClDummy] == SHOW_OTHERS_NOT_SET || m_aShowOthers[g_Config.m_ClDummy] != g_Config.m_ClShowOthers)
+	if(m_MultiViewActivated)
+	{
+		CNetMsg_Cl_ShowOthers Msg;
+		Msg.m_Show = SHOW_OTHERS_ONLY_TEAM;
+		Client()->SendPackMsgActive(&Msg, MSGFLAG_VITAL);
+
+		// update state
+		m_aShowOthers[g_Config.m_ClDummy] = SHOW_OTHERS_ONLY_TEAM;
+	}
+	else if(m_aShowOthers[g_Config.m_ClDummy] == SHOW_OTHERS_NOT_SET || m_aShowOthers[g_Config.m_ClDummy] != g_Config.m_ClShowOthers)
 	{
 		{
 			CNetMsg_Cl_ShowOthers Msg;
@@ -3349,4 +3412,217 @@ void CGameClient::SnapCollectEntities()
 
 		m_vSnapEntities.push_back({Ent.m_Item, Ent.m_pData, pDataEx});
 	}
+}
+
+void CGameClient::HandleMultiView()
+{
+	m_MultiViewIgnoring = 0;
+	bool idsActivated = IsIDsActivated();
+	bool init = false;
+	int amountPlayers = 0;
+	vec2 minpos, maxpos;
+	float tmpVel = 0.0f;
+
+	for(int i = 0; i < MAX_CLIENTS; i++)
+	{
+		if(m_MultiViewVanish[i])
+		{
+			m_MultiViewIgnoring++;
+			if(m_MultiViewLastFreeze[i] + 6.0f <= Client()->LocalTime() && m_aClients[i].m_FreezeEnd == 0)
+			{
+				m_MultiViewVanish[i] = false;
+				m_MultiViewLastFreeze[i] = 0.0f;
+			}
+		}
+
+		if(idsActivated && !m_MultiViewId[i]) // special ids activated and not in the list
+			continue;
+
+		if(m_MultiViewVanish[i])
+			continue;
+
+		// spectating a team specific or t0 and the player isnt in the team
+		if(m_Teams.Team(i) != m_MultiViewTeam)
+			continue;
+
+		vec2 player;
+		if(m_Snap.m_aCharacters[i].m_Active)
+			player = vec2(m_aClients[i].m_RenderPos.x, m_aClients[i].m_RenderPos.y);
+		else if(m_aClients[i].m_Spec) // spec tee (dotted outline)
+			player = m_aClients[i].m_SpecChar;
+		else
+			continue;
+
+		if(distance(m_MultiViewOldPos, player) > 1100 && m_aClients[i].m_FreezeEnd != 0) // too far away and frozen, so not relevant
+		{
+			if(m_MultiViewLastFreeze[i] == 0.0f)
+				m_MultiViewLastFreeze[i] = Client()->LocalTime();
+			else if(m_MultiViewLastFreeze[i] + 3.0f <= Client()->LocalTime())
+				m_MultiViewVanish[i] = true;
+		}
+		else if(m_MultiViewLastFreeze[i] != 0)
+		{
+			m_MultiViewLastFreeze[i] = 0;
+		}
+
+		if(!init)
+		{
+			minpos = player;
+			maxpos = player;
+			init = true;
+		}
+		else
+		{
+			minpos.x = std::min(minpos.x, player.x);
+			maxpos.x = std::max(maxpos.x, player.x);
+			minpos.y = std::min(minpos.y, player.y);
+			maxpos.y = std::max(maxpos.y, player.y);
+		}
+
+		const CNetObj_Character &CurrentCharacter = m_Snap.m_aCharacters[i].m_Cur;
+		tmpVel += (length(vec2(CurrentCharacter.m_VelX / 256.0f, CurrentCharacter.m_VelY / 256.0f)) * 50) / 32.0f;
+		amountPlayers++;
+	}
+
+	vec2 targetPos = vec2((minpos.x + maxpos.x) / 2.0f, (minpos.y + maxpos.y) / 2.0f);
+
+	if(amountPlayers == 0)
+	{
+		dbg_msg("dbg", "No more players to spectate, this shouldnt happen");
+		m_MultiViewActivated = false;
+		return;
+	}
+
+	m_MultiViewShowHud = amountPlayers == 1;
+	m_MultiViewPlayerDistance = distance(minpos, maxpos);
+	m_MultiViewCameraDistance = distance(m_MultiViewOldPos, targetPos);
+	m_MultiViewPlayerVelocity = clamp(tmpVel / amountPlayers ? tmpVel / (float)amountPlayers : 0.0f, 0.0f, 1000.0f);
+
+	if(m_MultiViewOldPersonalZoom == m_MultiViewPersonalZoom)
+		m_Camera.SetZoom(ZoomStuff(minpos, maxpos), g_Config.m_ClMultiViewZoomSmoothness);
+	else
+		m_Camera.SetZoom(ZoomStuff(minpos, maxpos), 50);
+
+	float multiplier = MultiplierStuff(targetPos);
+
+	m_Snap.m_SpecInfo.m_Position = m_MultiViewOldPos + ((targetPos - m_MultiViewOldPos) * multiplier);
+
+	m_MultiViewOldSpecID = m_Snap.m_SpecInfo.m_SpectatorID;
+	m_MultiViewOldPos = m_Snap.m_SpecInfo.m_Position;
+	m_Snap.m_SpecInfo.m_UsePosition = true;
+}
+
+bool CGameClient::InitMultiViewFromFreeview(int team)
+{
+	// m_Team = -1 means freeview, so teams are not important
+	m_MultiViewSolo = false;
+	m_MultiViewIsInit = true;
+	m_MultiViewActivated = true;
+	m_MultiViewOldSpecID = m_Snap.m_SpecInfo.m_SpectatorID;
+
+	CleanIds();
+
+	// get the current view coordinates
+	float width, height;
+	RenderTools()->CalcScreenParams(Graphics()->ScreenAspect(), m_Camera.m_Zoom, &width, &height);
+	vec2 xAxis = vec2(m_Camera.m_Center.x - (width / 2), m_Camera.m_Center.x + (width / 2));
+	vec2 yAxis = vec2(m_Camera.m_Center.y - (height / 2), m_Camera.m_Center.y + (height / 2));
+
+	m_MultiViewTeam = team;
+
+	if(team)
+		// m_Spectator.Spectate(-1); -> change if(idsActivated && m_Teams.Team(i) != m_MultiViewTeam) to if(m_MultiViewTeam > 0 && m_Teams.Team(i) != m_MultiViewTeam) too
+		return true;
+	else
+	{
+		int amountPlayers = 0;
+		for(int i = 0; i < MAX_CLIENTS; i++)
+		{
+			vec2 playerPos;
+
+			if(m_Snap.m_aCharacters[i].m_Active)
+				playerPos = vec2(m_Snap.m_aCharacters[i].m_Cur.m_X, m_Snap.m_aCharacters[i].m_Cur.m_Y);
+			else if(m_aClients[i].m_Spec)
+				playerPos = m_aClients[i].m_SpecChar;
+			else
+				continue;
+
+			// player isnt in t0
+			if(m_Teams.Team(i) != team)
+				continue;
+
+			if(playerPos.x != 0 && playerPos.y != 0)
+			{
+				if(playerPos.x > xAxis.x && playerPos.x < xAxis.y && playerPos.y > yAxis.x && playerPos.y < yAxis.y)
+				{
+					m_MultiViewId[i] = true;
+					amountPlayers++;
+				}
+			}
+		}
+
+		if(amountPlayers == 1)
+			m_MultiViewSolo = true;
+
+		return amountPlayers != 0;
+	}
+}
+
+float CGameClient::MultiplierStuff(vec2 camerapos)
+{
+	float maxCameraDist = 200.0f;
+	float minCameraDist = 20.0f;
+	float maxVel = 0.1f;
+	float minVel = 0.007f;
+
+	float tmp = distance(m_MultiViewOldPos, camerapos);
+	m_MultiViewMultiplier = clamp(MapValue(maxCameraDist, minCameraDist, maxVel, minVel, tmp) * g_Config.m_ClMultiViewMultiplierBoost, minVel, 1.0f);
+
+	return m_MultiViewMultiplier;
+}
+
+void CGameClient::CleanIds()
+{
+	std::fill(std::begin(m_MultiViewId), std::end(m_MultiViewId), false);
+	std::fill(std::begin(m_MultiViewLastFreeze), std::end(m_MultiViewLastFreeze), 0.0f);
+	std::fill(std::begin(m_MultiViewVanish), std::end(m_MultiViewVanish), false);
+}
+
+float CGameClient::ZoomStuff(vec2 minpos, vec2 maxpos)
+{
+	float ratio = Graphics()->ScreenAspect();
+	float maxPlayerDistance = 2500.0f;
+	float minPlayerDistance = -5500.0f;
+	float maxZoomX = 1.0f * powf(ratio, 2.6);
+	float minZoom = 17.5f;
+
+	float zoomX = MapValue(maxPlayerDistance, minPlayerDistance, maxZoomX, minZoom, maxpos.x - minpos.x);
+	float zoomY = MapValue(maxPlayerDistance, minPlayerDistance, 1.0f, minZoom, maxpos.y - minpos.y);
+	float zoom = std::min(zoomX, zoomY);
+
+	float diff = MapValue(70.0f, 10.0f, -1.5f, 0.0f, m_MultiViewPlayerVelocity);
+	zoom = clamp(zoom + clamp(diff, -1.5f, 0.0f), -10.0f, 9.0f);
+
+	zoom += m_MultiViewPersonalZoom;
+	m_MultiViewOldPersonalZoom = m_MultiViewPersonalZoom;
+
+	return zoom;
+}
+
+float CGameClient::MapValue(float valuemax, float valuemin, float rangemax, float rangemin, float value)
+{
+	return (rangemax - rangemin) / (valuemax - valuemin) * (value - valuemin) + rangemin;
+}
+
+void CGameClient::ResetMultiView()
+{
+	m_MultiViewSolo = false;
+	m_MultiViewIsInit = false;
+	m_MultiViewActivated = false;
+	m_MultiViewPersonalZoom = 0;
+}
+
+bool CGameClient::IsIDsActivated()
+{
+	return std::any_of(std::begin(m_MultiViewId), std::end(m_MultiViewId), [](bool mvID) { return mvID; });
 }
